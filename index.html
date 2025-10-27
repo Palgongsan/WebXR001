@@ -6,23 +6,9 @@
     <title>CERAGEM V11 WebXR Demo</title>
     <meta name="description" content="CERAGEM V11 제품을 WebXR 기반 AR 환경에서 체험하며 모드, 재질, 회전을 제어할 수 있는 프로토타입">
     <!-- 한국어 주석: CORS 이슈 방지를 위해 로컬에 저장한 model-viewer 모듈 사용 -->
-    <script type="module" src="./libs/model-viewer.min.js">
-  // Example UI logic (modelviewer.dev style)
-  const modelViewer = document.querySelector('model-viewer');
-  const slider = document.querySelector('.slider');
-  if (slider) {
-    slider.addEventListener('beforexrselect', (ev) => ev.preventDefault());
-  }
-  window.switchSrc = (element, name) => {
-    const base = './assets/ShopifyModels/' + name;
-    modelViewer.src = base + '.glb';
-    modelViewer.poster = base + '.webp';
-    const buttons = document.querySelectorAll('.slide');
-    buttons.forEach(b => b.classList.remove('selected'));
-    element.classList.add('selected');
-  };
-
-    </script>
+    <!-- original local script replaced for debug: <script type="module" src="./libs/model-viewer.min.js"></script> -->
+<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script nomodule src="https://unpkg.com/@google/model-viewer/dist/model-viewer-legacy.js"></script>
     <style>
       :root {
         color-scheme: light;
@@ -74,7 +60,7 @@
         min-height: clamp(420px, 60vh, 720px);
         border-radius: 24px;
         background: var(--surface);
-        border: 0px solid var(--border);
+        border: 1px solid var(--border);
         --poster-color: #eef0f6;
         --progress-bar-height: 4px;
         --progress-bar-color: rgba(47, 84, 235, 0.7);
@@ -216,28 +202,28 @@
         }
       }
     
-/* === model-viewer.dev example-like UI === */
-#ar-button {
-  background:white; color:#1a1a1a; border:0; border-radius:20px;
-  position:absolute; left:50%; transform:translateX(-50%);
-  bottom:16px; padding:10px 16px; font-weight:700; z-index:5;
+/* === FORCE VISIBILITY FOR AR UI (debug) === */
+#ar-button,
+[slot="ar-button"]#ar-start,
+model-viewer ::slotted(#ar-button) {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  bottom: 16px;
+  display: inline-flex !important;
+  align-items: center; gap: 8px;
+  background: #ffffff; color: #111; border: 0; border-radius: 20px;
+  padding: 10px 16px; font-weight: 700; z-index: 10000;
+  box-shadow: 0 4px 20px rgba(0,0,0,.18);
 }
-#ar-prompt { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; pointer-events:none; }
-#ar-prompt img { animation: circle 2s infinite ease-in-out; }
-@keyframes circle {
-  from { transform: translate(-50%,-50%) scale(1); opacity: .9;}
-  50% { transform: translate(-50%,-50%) scale(1.1); opacity: .6;}
-  to { transform: translate(-50%,-50%) scale(1); opacity: .9;}
-}
-#ar-failure { position:absolute; left:50%; transform:translateX(-50%); top:16px; display:none; }
-model-viewer[ar-status="session-started"] #ar-prompt { display:block; }
-model-viewer[ar-status="failed"] #ar-failure { display:block; }
-
-/* DOM overlay carousel from example */
-.slider { position: absolute; left:0; right:0; bottom:0; display:flex; justify-content:center; padding: 12px; }
-.slides { display:flex; gap:8px; background: rgba(0,0,0,.4); padding:8px; border-radius:12px; backdrop-filter: blur(6px); }
-.slide { width:56px; height:56px; border-radius:8px; background-size:cover; background-position:center; border:2px solid rgba(255,255,255,.5); }
-.slide.selected { outline:3px solid white; }
+#ar-button img { height: 24px; }
+/* Make overlay clickable and above XR surface */
+#ar-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 10000; }
+#ar-overlay * { pointer-events: auto; }
+model-viewer[ar-status="session-started"] #ar-overlay,
+model-viewer[ar-status="object-placed"]   #ar-overlay { display: flex !important; }
+model-viewer[ar-status="failed"]          #ar-overlay { display: none !important; }
+/* Also keep legacy class path */
+#ar-overlay.dom-overlay-active { display: flex !important; }
 
     </style>
   </head>
@@ -262,22 +248,31 @@ model-viewer[ar-status="failed"] #ar-failure { display:block; }
         ar-placement="floor"
         ar-scale="fixed"
         ar-dom-overlay="ar-overlay"
-       ar ar-modes="webxr" xr-environment>
-    <button slot="ar-button" id="ar-button" type="button">View in your space</button>
-    <div id="ar-prompt"><img src="https://modelviewer.dev/shared-assets/icons/hand.png" alt="Move phone to find surface"></div>
-    <button id="ar-failure" slot="ar-status">AR is not tracking!</button>
+      >
+        <button slot="ar-button" id="ar-start" type="button">
+          <img src="./img/AR in.png" alt="AR 세션 시작">
+        </button>
+        <div id="ar-unsupported">현재 브라우저는 WebXR AR을 지원하지 않습니다.</div>
+        <div slot="ar-prompt" id="ar-prompt">
+          <img src="https://modelviewer.dev/shared-assets/icons/hand.png" alt="AR 조작 안내">
+        </div>
+        <div id="ar-failure" slot="ar-status">AR 추적 문제 발생</div>
 
-    <div id="ar-overlay" slot="ar-dom-overlay">
-      
-    <div class="slider">
-      <div class="slides">
-        <button class="slide selected" onclick="switchSrc(this, 'Chair')" style="background-image:url('./assets/ShopifyModels/Chair.webp');"></button>
-        <button class="slide" onclick="switchSrc(this, 'Mixer')" style="background-image:url('./assets/ShopifyModels/Mixer.webp');"></button>
-      </div>
-    </div>
-
-    </div>
-</model-viewer>
+        <div id="ar-overlay" slot="ar-dom-overlay">
+          <button class="control-button" type="button" data-control="mode">
+            애니메이션 모드 전환
+            <span data-status>현재: 체어 모드</span>
+          </button>
+          <button class="control-button" type="button" data-control="texture">
+            텍스처 컬러 순환
+            <span data-status>기본 → Beige → Olive</span>
+          </button>
+          <button class="control-button" type="button" data-control="rotate">
+            90° 회전
+            <span data-status>현재 각도 기준</span>
+          </button>
+        </div>
+      </model-viewer>
 
       <div class="controls-grid" id="preview-controls">
         <button class="control-button" type="button" data-control="mode">
@@ -582,5 +577,55 @@ model-viewer[ar-status="failed"] #ar-failure { display:block; }
 
       // 한국어 주석: 치수 기능은 비활성화 상태로 유지
     </script>
-  </body>
+  
+<!-- Fallback AR button (outside model-viewer) for environments hiding slot UI) -->
+<button id="fallback-ar" style="position:fixed;right:16px;bottom:16px;z-index:10001;
+  background:#111;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;">
+  AR 시작(백업)
+</button>
+<!-- Tiny AR debug HUD -->
+<div id="ar-hud" style="position:fixed;left:10px;top:10px;z-index:10002;background:rgba(0,0,0,.6);
+  color:#fff;padding:8px 10px;border-radius:8px;font:12px/1.3 system-ui;">
+  <div>status: <span id="hud-status">-</span></div>
+  <div>canActivateAR: <span id="hud-can">-</span></div>
+  <div>domOverlayState: <span id="hud-overlay">-</span></div>
+</div>
+
+
+<script>
+(function(){
+  const mv = document.getElementById('cera-viewer') || document.querySelector('model-viewer');
+  const fallback = document.getElementById('fallback-ar');
+  const overlay = document.getElementById('ar-overlay');
+  const hud = {
+    status: document.getElementById('hud-status'),
+    can: document.getElementById('hud-can'),
+    overlay: document.getElementById('hud-overlay')
+  };
+
+  function refreshHUD(){
+    try {
+      hud.status.textContent = mv?.getAttribute('ar-status') ?? '-';
+      hud.can.textContent = mv?.canActivateAR ? 'true' : 'false';
+      const t = mv?.xrSession?.domOverlayState?.type ?? 'none';
+      hud.overlay.textContent = t;
+    } catch(e){}
+  }
+  refreshHUD();
+  setInterval(refreshHUD, 500);
+
+  // Always allow entering AR via fallback button
+  fallback?.addEventListener('click', async (e)=>{
+    e.preventDefault();
+    try { await mv?.enterAR?.(); } catch(err){ console.warn('fallback enterAR error', err); }
+  });
+
+  // Prevent XR gesture capture on overlay buttons
+  overlay?.addEventListener('beforexrselect', ev => ev.preventDefault());
+
+  mv?.addEventListener('ar-status', refreshHUD);
+})();
+</script>
+
+</body>
 </html>
