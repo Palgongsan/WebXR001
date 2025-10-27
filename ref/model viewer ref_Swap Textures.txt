@@ -1,0 +1,98 @@
+Swap textures
+As above, you can change these values in AR, but only in WebXR mode. iOS Quick Look reflects these texture changes so long as the USDZ is auto-generated.
+
+<model-viewer id="helmet" camera-controls touch-action="pan-y" src="../../shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb" ar alt="A 3D model of a helmet">
+                  <div class="controls glass">
+                    <div>
+                      <p>Diffuse</p>
+                      <select id="diffuse">
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF/Default_albedo.jpg">
+                          Damaged helmet</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/Lantern/glTF/Lantern_baseColor.png">
+                          Lantern Pole</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/WaterBottle/glTF/WaterBottle_baseColor.png">
+                          Water Bottle</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p>Metallic-roughness</p>
+                      <select id="metallicRoughness">
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF/Default_metalRoughness.jpg">
+                          Damaged helmet</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/Lantern/glTF/Lantern_roughnessMetallic.png">
+                          Lantern Pole</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/WaterBottle/glTF/WaterBottle_occlusionRoughnessMetallic.png">
+                          Water Bottle</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p>Normals</p>
+                      <select id="normals">
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF/Default_normal.jpg">
+                          Damaged helmet</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/Lantern/glTF/Lantern_normal.png">
+                          Lantern Pole</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/WaterBottle/glTF/WaterBottle_normal.png">
+                          Water Bottle</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p>Occlusion</p>
+                      <select id="occlusion">
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF/Default_AO.jpg">
+                          Damaged helmet</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/WaterBottle/glTF/WaterBottle_occlusionRoughnessMetallic.png">
+                          Water Bottle</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p>Emission</p>
+                      <select id="emission">
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF/Default_emissive.jpg">
+                          Damaged helmet</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/Lantern/glTF/Lantern_emissive.png">
+                          Lantern Pole</option>
+                        <option value="../../shared-assets/models/glTF-Sample-Assets/Models/WaterBottle/glTF/WaterBottle_emissive.png">
+                          Water Bottle</option>
+                      </select>
+                    </div>
+                  </div>
+                </model-viewer>
+                <script type="module">
+                  const modelViewerTexture1 = document.querySelector("model-viewer#helmet");
+
+                  modelViewerTexture1.addEventListener("load", () => {
+
+                    const material = modelViewerTexture1.model.materials[0];
+
+                    const createAndApplyTexture = async (channel, event) => {
+                      const texture = await modelViewerTexture1.createTexture(event.target.value);
+                      if (channel.includes('base') || channel.includes('metallic')) {
+                        material.pbrMetallicRoughness[channel].setTexture(texture);
+                      } else {
+                        material[channel].setTexture(texture);
+                      }
+                    }
+
+                    document.querySelector('#normals').addEventListener('input', (event) => {
+                      createAndApplyTexture('normalTexture', event);
+                    });
+
+                    document.querySelector('#occlusion').addEventListener('input', (event) => {
+                      createAndApplyTexture('occlusionTexture', event);
+                    });
+
+                    document.querySelector('#emission').addEventListener('input', (event) => {
+                      createAndApplyTexture('emissiveTexture', event);
+                    });
+
+                    document.querySelector('#diffuse').addEventListener('input', (event) => {
+                      createAndApplyTexture('baseColorTexture', event);
+                    });
+
+                    document.querySelector('#metallicRoughness').addEventListener('input', (event) => {
+                      createAndApplyTexture('metallicRoughnessTexture', event);
+                    });
+                  });
+
+                </script>

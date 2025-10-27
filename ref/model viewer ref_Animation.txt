@@ -1,0 +1,135 @@
+Animation. Use <model-viewer> to show off your animated models. This page showcases how you can control models with animations
+Automatically play animations with the autoplay attribute
+<model-viewer camera-controls touch-action="pan-y" autoplay ar ar-modes="webxr scene-viewer" scale="0.2 0.2 0.2" shadow-intensity="1" src="../../shared-assets/models/RobotExpressive.glb" alt="An animated 3D model of a robot"></model-viewer>
+Select a specific animation with animation-name
+<model-viewer camera-controls touch-action="pan-y" autoplay animation-name="Running" ar ar-modes="webxr scene-viewer" scale="0.2 0.2 0.2" shadow-intensity="1" src="../../shared-assets/models/RobotExpressive.glb" alt="An animate 3D model of a robot"></model-viewer>
+Change animation speed
+<model-viewer id="change-speed-demo" camera-controls touch-action="pan-y" animation-name="Dance" ar ar-modes="webxr scene-viewer" scale="0.2 0.2 0.2" shadow-intensity="1" src="../../shared-assets/models/RobotExpressive.glb" alt="An animate 3D model of a robot"></model-viewer>
+                <script type="module">
+                  const modelViewer = document.querySelector('#change-speed-demo');
+                  const speeds = [1, 2, 0.5, -1];
+
+                  let i = 0;
+                  const play = () => {
+                    modelViewer.timeScale = speeds[i++ % speeds.length];
+                    modelViewer.play({ repetitions: 1 });
+                  };
+                  modelViewer.addEventListener('load', play);
+                  modelViewer.addEventListener('finished', play);
+                </script>
+
+
+Animations crossfade when you change them
+<model-viewer id="paused-change-demo" camera-controls touch-action="pan-y" autoplay animation-name="Running" ar ar-modes="webxr scene-viewer" scale="0.2 0.2 0.2" shadow-intensity="1" src="../../shared-assets/models/RobotExpressive.glb" alt="An animated 3D model of a robot"></model-viewer>
+                <script>
+                  (() => {
+                    const modelViewer = document.querySelector('#paused-change-demo');
+
+                    self.setInterval(() => {
+                      modelViewer.animationName = modelViewer.animationName === 'Running' ?
+                        'Wave' : 'Running';
+                    }, 1500.0);
+                  })();
+                </script>
+Select model: 
+Robot
+Dance
+
+Death
+
+Idle
+
+Jump
+
+No
+
+Punch
+
+Running
+
+Sitting
+
+Standing
+
+ThumbsUp
+
+Walking
+
+WalkJump
+
+Wave
+
+Yes
+
+
+
+Play and control several different animations of the model simultaneously or create new modes by combining them!
+<model-viewer id="append-demo" camera-controls touch-action="pan-y" ar ar-modes="webxr scene-viewer" scale="0.2 0.2 0.2" shadow-intensity="1" alt="An animated 3D model of a soldier">
+                  <div class="model-selection-box glass">
+                    <label for="blend-model-selection">Select model:</label>
+                    <select id="blend-model-selection">
+                      <option selected value="RobotExpressive.glb">Robot</option>
+                      <option value="soldier.glb">Soldier</option>
+                    </select>
+                  </div>
+                  <div class="controls glass">
+                  </div>
+                </model-viewer>
+                <script>
+                  (() => {
+                    const modelViewer = document.querySelector('#append-demo');
+                    const controlsPanel = document.querySelector('#append-demo .controls');
+                    const blend_model_selection = document.querySelector('.model-selection-box #blend-model-selection');
+
+                    blend_model_selection.addEventListener("change", event => {
+                      controlsPanel.innerHTML = "";
+                      changeModel(event.target.value);
+                    });
+
+                    modelViewer.addEventListener("load", loadModelAnimations);
+
+                    function loadModelAnimations() {
+                      if (blend_model_selection.value === "soldier.glb") {
+                        modelViewer.setAttribute("camera-orbit", "180deg");
+                      } else {
+                        modelViewer.removeAttribute("camera-orbit");
+                      }
+                      modelViewer.availableAnimations.forEach(animationName => {
+                        if (animationName !== "TPose")
+                          controlsPanel.innerHTML += `
+                          <label for="${animationName}">${animationName}</label>
+                          <input id="${animationName}" type="range" min="0" max="1" step="0.01" value="0">
+                        `;
+                      });
+
+                      controlsPanel.querySelectorAll("input[type='range']").forEach(slider => {
+                        slider.addEventListener("input", updateAnimation);
+                      });
+                    }
+
+                    function updateAnimation(event) {
+                      modelViewer.appendAnimation(event.target.id, {
+                        weight: parseFloat(event.target.value)
+                      });
+                    }
+
+                    function changeModel(modelName) {
+                      modelViewer.setAttribute("src", `../../shared-assets/models/${modelName}`);
+                    }
+
+                    changeModel(blend_model_selection.value);
+
+                  })();
+                </script>
+A paused model shows the first frame of the configured animation
+<model-viewer id="xfade-demo" camera-controls touch-action="pan-y" animation-name="Running" ar ar-modes="webxr scene-viewer" scale="0.2 0.2 0.2" shadow-intensity="1" src="../../shared-assets/models/RobotExpressive.glb" alt="An animated 3D model of a robot or soldier"></model-viewer>
+                <script>
+                  (() => {
+                    const modelViewer = document.querySelector('#xfade-demo');
+
+                    self.setInterval(() => {
+                      modelViewer.animationName = modelViewer.animationName === 'Running' ?
+                        'Idle' : 'Running';
+                    }, 1500.0);
+                  })();
+                </script>
