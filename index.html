@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>CERAGEM V11 AR Test - Simplified</title>
+    <title>CERAGEM V11 AR - DOM Overlay Slot Test</title>
     <script type="module" src="./libs/model-viewer.min.js"></script>
     
     <style>
@@ -19,48 +19,43 @@
             background-color: #f0f0f0;
         }
 
-        /* AR 세션 중에만 표시되는 버튼들 */
-        .ar-controls {
-            position: fixed;
-            bottom: 16px;
-            left: 16px;
-            right: 16px;
-            display: none;
+        /* DOM Overlay 컨테이너 - model-viewer 내부 slot용 */
+        .overlay-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
             flex-direction: column;
             gap: 10px;
-            z-index: 1;
+            padding: 16px;
+            pointer-events: none;
         }
 
-        /* ar-status 속성 기반 스타일링 - model-viewer 공식 방식 */
-        model-viewer[ar-status="session-started"] ~ .ar-controls {
-            display: flex;
-        }
-
-        .ar-button {
+        .overlay-content button {
             background: white;
             border: none;
             padding: 16px;
             border-radius: 8px;
             font-size: 16px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            pointer-events: auto;
         }
 
-        /* slot 내부 버튼 스타일 (대체 방법) */
-        #ar-button-slot {
-            background: white;
-            border-radius: 8px;
-            padding: 12px 24px;
-            border: 1px solid #ccc;
-            position: absolute;
-            bottom: 16px;
-            right: 16px;
+        /* AR 세션 중에만 표시 */
+        .overlay-content {
+            display: none;
+        }
+
+        model-viewer[ar-tracking="tracking"] .overlay-content {
+            display: flex;
         }
     </style>
 </head>
 <body>
-    <h1>AR DOM Overlay 테스트</h1>
+    <h1>DOM Overlay Slot 방식 테스트</h1>
     
-    <!-- 방법 1: 기본 model-viewer 설정 -->
+    <!-- DOM overlay를 model-viewer 내부에 slot으로 배치 -->
     <model-viewer
         id="viewer"
         src="./src/CERA_V11_low_Draco6_WebP_4K_001_self_optimize.glb"
@@ -71,42 +66,69 @@
         ar-modes="webxr"
         ar-placement="floor"
     >
-        <!-- AR 버튼 커스터마이즈 (선택사항) -->
-        <button slot="ar-button" id="ar-button-slot">
-            AR로 보기
-        </button>
+        <!-- AR 버튼 -->
+        <button slot="ar-button">AR로 보기</button>
+        
+        <!-- DOM Overlay 콘텐츠를 model-viewer 내부에 배치 -->
+        <div class="overlay-content" slot="ar" id="ar-overlay">
+            <button onclick="handleModeChange()">모드 전환</button>
+            <button onclick="handleTextureChange()">텍스처 변경</button>
+            <button onclick="handleRotate()">90° 회전</button>
+        </div>
     </model-viewer>
-
-    <!-- 방법 1: AR 세션 중 표시할 컨트롤 (model-viewer 외부) -->
-    <div class="ar-controls" id="external-controls">
-        <button class="ar-button" onclick="console.log('모드 전환')">모드 전환</button>
-        <button class="ar-button" onclick="console.log('텍스처 변경')">텍스처 변경</button>
-        <button class="ar-button" onclick="console.log('회전')">90° 회전</button>
-    </div>
 
     <script>
         const viewer = document.getElementById('viewer');
-        const controls = document.getElementById('external-controls');
+        const overlay = document.getElementById('ar-overlay');
         
         // AR 상태 모니터링
         viewer.addEventListener('ar-status', (event) => {
-            console.log('AR Status:', event.detail.status);
+            const status = event.detail.status;
+            console.log('AR Status:', status);
             
-            if (event.detail.status === 'session-started') {
-                // AR 세션 시작
-                console.log('✅ AR 세션 활성화');
-                controls.style.display = 'flex';
+            if (status === 'session-started') {
+                console.log('✅ AR 세션 시작');
+                overlay.style.display = 'flex';
                 
-                // XR 세션 정보 확인
-                if (viewer.xrSession) {
-                    console.log('XR Session:', viewer.xrSession);
-                    console.log('DOM Overlay State:', viewer.xrSession.domOverlayState);
-                }
-            } else {
-                // AR 세션 종료
-                controls.style.display = 'none';
+                // 세션 정보 확인
+                setTimeout(() => {
+                    if (viewer.xrSession) {
+                        console.log('XR Session:', viewer.xrSession);
+                        console.log('DOM Overlay State:', viewer.xrSession.domOverlayState);
+                        
+                        if (viewer.xrSession.domOverlayState) {
+                            console.log('✅ DOM Overlay 활성화됨');
+                        } else {
+                            console.warn('⚠️ DOM Overlay 미지원');
+                        }
+                    }
+                }, 100);
+            } else if (status === 'not-presenting') {
+                console.log('🔴 AR 세션 종료');
+                overlay.style.display = 'none';
             }
         });
+        
+        // AR tracking 상태 모니터링
+        viewer.addEventListener('ar-tracking', (event) => {
+            console.log('AR Tracking:', event.detail.status);
+        });
+        
+        // 버튼 핸들러
+        function handleModeChange() {
+            console.log('모드 전환 클릭');
+            // 애니메이션 변경 로직
+        }
+        
+        function handleTextureChange() {
+            console.log('텍스처 변경 클릭');
+            // 텍스처 변경 로직
+        }
+        
+        function handleRotate() {
+            console.log('회전 클릭');
+            // 회전 로직
+        }
         
         // 모델 로드 확인
         viewer.addEventListener('load', () => {
