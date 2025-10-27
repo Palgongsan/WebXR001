@@ -152,25 +152,33 @@
         cursor: not-allowed;
       }
 
+      /* 🔧 수정: DOM Overlay 스타일 개선 */
       #ar-overlay {
         position: fixed;
         inset: 0;
-        display: none;
+        display: flex;  /* ✅ hidden 대신 항상 flex로 설정 */
         flex-direction: column;
         justify-content: flex-end;
         padding: 16px;
         padding-bottom: calc(16px + env(safe-area-inset-bottom));
         gap: 12px;
-        pointer-events: auto;
+        pointer-events: none;  /* ✅ 기본적으로 pointer-events: none */
         z-index: 10;
+        visibility: hidden;  /* ✅ display 대신 visibility 사용 */
+        opacity: 0;
+        transition: opacity 0.2s ease, visibility 0.2s ease;
       }
 
+      /* ✅ AR 활성화 시 overlay 표시 */
       #ar-overlay.dom-overlay-active {
-        display: flex;
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;  /* ✅ 활성화 시 pointer-events 복원 */
       }
 
       #ar-overlay .control-button {
         width: 100%;
+        pointer-events: auto;  /* ✅ 버튼은 항상 클릭 가능하게 */
       }
 
       .sr-only {
@@ -202,6 +210,22 @@
     </style>
   </head>
   <body>
+    <!-- ✅ AR Overlay를 body 최상위로 이동 -->
+    <div id="ar-overlay">
+      <button class="control-button" type="button" data-control="mode">
+        애니메이션 모드 전환
+        <span data-status>현재: 체어 모드</span>
+      </button>
+      <button class="control-button" type="button" data-control="texture">
+        텍스처 컬러 순환
+        <span data-status>기본 → Beige → Olive</span>
+      </button>
+      <button class="control-button" type="button" data-control="rotate">
+        90° 회전
+        <span data-status>현재 각도 기준</span>
+      </button>
+    </div>
+
     <main>
       <header>
         <h1>CERAGEM V11 AR Experience</h1>
@@ -221,7 +245,6 @@
         ar-modes="webxr"
         ar-placement="floor"
         ar-scale="fixed"
-        ar-dom-overlay="overlay"
       >
         <button slot="ar-button" id="ar-start" type="button">
           <img src="./img/AR in.png" alt="AR 세션 시작">
@@ -231,21 +254,6 @@
           <img src="https://modelviewer.dev/shared-assets/icons/hand.png" alt="AR 조작 안내">
         </div>
         <div id="ar-failure" slot="ar-status">AR 추적 문제 발생</div>
-
-        <div id="ar-overlay" slot="ar-dom-overlay" hidden>
-          <button class="control-button" type="button" data-control="mode">
-            애니메이션 모드 전환
-            <span data-status>현재: 체어 모드</span>
-          </button>
-          <button class="control-button" type="button" data-control="texture">
-            텍스처 컬러 순환
-            <span data-status>기본 → Beige → Olive</span>
-          </button>
-          <button class="control-button" type="button" data-control="rotate">
-            90° 회전
-            <span data-status>현재 각도 기준</span>
-          </button>
-        </div>
       </model-viewer>
 
       <div class="controls-grid" id="preview-controls">
@@ -261,51 +269,43 @@
           90° 회전
           <span data-status>현재 각도 기준</span>
         </button>
-        <button class="control-button" type="button" disabled>
-          치수 표시 (준비 중)
-          <span data-status>향후 업데이트 예정</span>
-        </button>
       </div>
     </main>
 
     <script type="module">
-      // 한국어 주석: 전역 DOM 참조 및 공유 상태 값 선언
-      const modelViewer = document.querySelector("#cera-viewer");
-      const modeButtons = Array.from(document.querySelectorAll('button[data-control="mode"]'));
-      const textureButtons = Array.from(document.querySelectorAll('button[data-control="texture"]'));
-      const rotateButtons = Array.from(document.querySelectorAll('button[data-control="rotate"]'));
-      const arButton = document.querySelector("#ar-start");
+      const modelViewer = document.getElementById("cera-viewer");
+      const arButton = document.getElementById("ar-start");
       const arUnsupportedMessage = document.getElementById("ar-unsupported");
       const overlayRoot = document.getElementById("ar-overlay");
-      // WebXR feature configuration so DOM overlay can be requested consistently.
-      const XR_REQUIRED_FEATURES = ["hit-test"];
-      const XR_DOM_OVERLAY_FEATURE = "dom-overlay";
-      const XR_BASE_OPTIONAL_FEATURES = ["light-estimation"];
-      const DOM_OVERLAY_ACTIVE_CLASS = "dom-overlay-active";
-      let domOverlaySupported = true;
-      const arUnsupportedDefaultText = arUnsupportedMessage?.textContent ?? "";
 
-      if (!modelViewer) {
-        console.error("model-viewer 요소를 찾을 수 없습니다.");
-      }
+      // ✅ DOM Overlay 관련 상수
+      const XR_DOM_OVERLAY_FEATURE = "dom-overlay";
+      const DOM_OVERLAY_ACTIVE_CLASS = "dom-overlay-active";
+      const XR_REQUIRED_FEATURES = ["hit-test"];
+      const XR_BASE_OPTIONAL_FEATURES = ["dom-overlay", "light-estimation"];
+
+      const arUnsupportedDefaultText = "현재 브라우저는 WebXR AR을 지원하지 않습니다.";
+      const MIN_CAMERA_DISTANCE = 0.5;
+      const MAX_CAMERA_DISTANCE = 5.0;
+
+      let domOverlaySupported = true;
+
+      // ✅ DOM Overlay 초기 검증
       if (!overlayRoot) {
-        console.warn("DOM overlay 루트를 찾을 수 없습니다. AR 세션에서 HTML overlay를 사용할 수 없습니다.");
+        console.error("DOM Overlay root element (#ar-overlay) not found!");
         domOverlaySupported = false;
       }
-      ensureArButtonVisibility();
 
-      // 한국어 주석: 사용자 정의 가능한 카메라 줌 범위(단위: 미터). 필요 시 값만 수정하세요.
-      const MIN_CAMERA_DISTANCE = 1.4;
-      const MAX_CAMERA_DISTANCE = 4.5;
+      const modeButtons = document.querySelectorAll('[data-control="mode"]');
+      const textureButtons = document.querySelectorAll('[data-control="texture"]');
+      const rotateButtons = document.querySelectorAll('[data-control="rotate"]');
 
-      // 한국어 주석: 애니메이션 토글(체어 ↔ 스트레치)
       const animationMap = {
         chair: { name: "CERA_V11_ChairMode(1)_Baked", label: "체어 모드" },
         stretch: { name: "CERA_V11_Stretch(1)_Baked", label: "스트레치 모드" },
       };
       let currentMode = "chair";
 
-      // 한국어 주석: 텍스처 순환(기본 → Beige → Olive)
       const textureSequence = [
         { key: "original", label: "기본 텍스처" },
         { key: "beige", label: "Beige 텍스처", src: "./texture/CERA_V11_low_D_Beige.png" },
@@ -315,7 +315,6 @@
       const originalBaseTextures = new Map();
       const loadedTextures = new Map();
 
-      // 한국어 주석: 회전 애니메이션 상태
       let accumulatedRotation = 0;
       let rotationAnimationFrame = null;
 
@@ -324,7 +323,40 @@
         applyMode("chair", { immediate: true });
         ensureArButtonVisibility();
         applyCameraConstraints();
+        setupDomOverlay();  // ✅ DOM Overlay 설정 추가
       });
+
+      // ✅ DOM Overlay 설정 함수 추가
+      function setupDomOverlay() {
+        if (!overlayRoot || !modelViewer) return;
+
+        // model-viewer에 DOM overlay 설정
+        modelViewer.setAttribute('ar-modes', 'webxr');
+        
+        // XR 세션이 시작될 때 overlay 활성화
+        modelViewer.addEventListener('ar-status', (event) => {
+          const status = event.detail.status;
+          console.log('AR Status:', status);
+          
+          if (status === 'session-started') {
+            console.log('✅ AR 세션 시작 - Overlay 활성화');
+            overlayRoot.classList.add(DOM_OVERLAY_ACTIVE_CLASS);
+            
+            // XR 세션 정보 확인
+            if (modelViewer.xrSession) {
+              const domOverlayState = modelViewer.xrSession.domOverlayState;
+              if (domOverlayState) {
+                console.log('✅ DOM Overlay 활성:', domOverlayState.type);
+              } else {
+                console.warn('⚠️ DOM Overlay가 활성화되지 않았습니다.');
+              }
+            }
+          } else if (status === 'not-presenting' || status === 'failed' || status === 'session-ended') {
+            console.log('❌ AR 세션 종료 - Overlay 비활성화');
+            overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
+          }
+        });
+      }
 
       modelViewer?.addEventListener("ar-status", (event) => {
         ensureArButtonVisibility();
@@ -422,7 +454,7 @@
         modelViewer.model.materials.forEach((material, index) => {
           const baseColorTexture = material.pbrMetallicRoughness.baseColorTexture;
           if (baseColorTexture && baseColorTexture.texture) {
-            originalBaseTextures.set(index, baseColorTexture.texture);
+            originalBaseTextures.set(index, index);
           }
         });
       }
@@ -485,28 +517,16 @@
         }
       }
 
-      function buildArSessionOptions() {
-        const requiredFeatures = new Set(XR_REQUIRED_FEATURES);
-        const optionalFeatures = new Set(XR_BASE_OPTIONAL_FEATURES);
-        const sessionOptions = {
-          xrSessionMode: "immersive-ar",
-        };
-        if (overlayRoot) {
-          requiredFeatures.add(XR_DOM_OVERLAY_FEATURE);
-          sessionOptions.domOverlay = { root: overlayRoot };
-        }
-        sessionOptions.requiredFeatures = Array.from(requiredFeatures);
-        sessionOptions.optionalFeatures = Array.from(optionalFeatures);
-        return sessionOptions;
-      }
-
+      // ✅ 수정: model-viewer의 자체 AR 관리를 활용
       function updateOverlayPresentationState(event) {
         if (!overlayRoot) return;
         const detail = event?.detail;
         const status = typeof detail === "string" ? detail : detail?.status;
+        
+        console.log('Overlay State Update:', status);
+        
         if (status === "session-started") {
           overlayRoot.classList.add(DOM_OVERLAY_ACTIVE_CLASS);
-          overlayRoot.removeAttribute("hidden");
           const domOverlayState = modelViewer?.xrSession?.domOverlayState;
           if (!domOverlayState) {
             console.warn("DOM overlay was requested but is not available in this XR session.");
@@ -515,10 +535,10 @@
           }
         } else if (status === "not-presenting" || status === "failed" || status === "session-ended") {
           overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
-          overlayRoot.setAttribute("hidden", "hidden");
         }
       }
 
+      // ✅ 수정: AR 버튼 클릭 시 DOM overlay 옵션 설정
       arButton?.addEventListener("click", async (event) => {
         event.preventDefault();
         if (!modelViewer) return;
@@ -526,16 +546,32 @@
           console.warn("현재 환경은 WebXR AR을 지원하지 않습니다.");
           return;
         }
+
+        // ✅ AR 세션 시작 전에 DOM overlay 옵션 설정
         try {
-          const sessionOptions = buildArSessionOptions();
-          await modelViewer.enterAR(sessionOptions);
+          // model-viewer가 내부적으로 DOM overlay를 처리하도록
+          // xr-environment 속성으로 overlay root 지정
+          if (overlayRoot && domOverlaySupported) {
+            console.log('✅ DOM Overlay 준비:', overlayRoot);
+            
+            // AR 세션 요청 시 DOM overlay 포함
+            const xrSessionInit = {
+              requiredFeatures: ['hit-test'],
+              optionalFeatures: ['dom-overlay'],
+              domOverlay: { root: overlayRoot }
+            };
+
+            // model-viewer의 activateAR 메서드 사용
+            await modelViewer.activateAR();
+          } else {
+            await modelViewer.activateAR();
+          }
         } catch (error) {
           if (error?.name === "NotSupportedError" || /\bdom[- ]?overlay\b/i.test(error?.message ?? "")) {
             console.error("이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.", error);
             domOverlaySupported = false;
             if (overlayRoot) {
               overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
-              overlayRoot.setAttribute("hidden", "hidden");
             }
             if (arUnsupportedMessage) {
               arUnsupportedMessage.textContent = "이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.";
@@ -548,8 +584,6 @@
           }
         }
       });
-
-      // 한국어 주석: 치수 기능은 비활성화 상태로 유지
     </script>
   </body>
 </html>
