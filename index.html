@@ -6,7 +6,23 @@
     <title>CERAGEM V11 WebXR Demo</title>
     <meta name="description" content="CERAGEM V11 제품을 WebXR 기반 AR 환경에서 체험하며 모드, 재질, 회전을 제어할 수 있는 프로토타입">
     <!-- 한국어 주석: CORS 이슈 방지를 위해 로컬에 저장한 model-viewer 모듈 사용 -->
-    <script type="module" src="./libs/model-viewer.min.js"></script>
+    <script type="module" src="./libs/model-viewer.min.js">
+  // Example UI logic (modelviewer.dev style)
+  const modelViewer = document.querySelector('model-viewer');
+  const slider = document.querySelector('.slider');
+  if (slider) {
+    slider.addEventListener('beforexrselect', (ev) => ev.preventDefault());
+  }
+  window.switchSrc = (element, name) => {
+    const base = './assets/ShopifyModels/' + name;
+    modelViewer.src = base + '.glb';
+    modelViewer.poster = base + '.webp';
+    const buttons = document.querySelectorAll('.slide');
+    buttons.forEach(b => b.classList.remove('selected'));
+    element.classList.add('selected');
+  };
+
+    </script>
     <style>
       :root {
         color-scheme: light;
@@ -58,7 +74,7 @@
         min-height: clamp(420px, 60vh, 720px);
         border-radius: 24px;
         background: var(--surface);
-        border: 1px solid var(--border);
+        border: 0px solid var(--border);
         --poster-color: #eef0f6;
         --progress-bar-height: 4px;
         --progress-bar-color: rgba(47, 84, 235, 0.7);
@@ -168,11 +184,6 @@
       #ar-overlay.dom-overlay-active {
         display: flex;
       }
-      /* Also show overlay based on <model-viewer> ar-status */
-      model-viewer[ar-status="session-started"] #ar-overlay,
-      model-viewer[ar-status="object-placed"] #ar-overlay { display: flex; }
-      model-viewer[ar-status="failed"] #ar-overlay { display: none; }
-
 
       #ar-overlay .control-button {
         width: 100%;
@@ -204,6 +215,30 @@
           flex: 1 1 100%;
         }
       }
+    
+/* === model-viewer.dev example-like UI === */
+#ar-button {
+  background:white; color:#1a1a1a; border:0; border-radius:20px;
+  position:absolute; left:50%; transform:translateX(-50%);
+  bottom:16px; padding:10px 16px; font-weight:700; z-index:5;
+}
+#ar-prompt { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; pointer-events:none; }
+#ar-prompt img { animation: circle 2s infinite ease-in-out; }
+@keyframes circle {
+  from { transform: translate(-50%,-50%) scale(1); opacity: .9;}
+  50% { transform: translate(-50%,-50%) scale(1.1); opacity: .6;}
+  to { transform: translate(-50%,-50%) scale(1); opacity: .9;}
+}
+#ar-failure { position:absolute; left:50%; transform:translateX(-50%); top:16px; display:none; }
+model-viewer[ar-status="session-started"] #ar-prompt { display:block; }
+model-viewer[ar-status="failed"] #ar-failure { display:block; }
+
+/* DOM overlay carousel from example */
+.slider { position: absolute; left:0; right:0; bottom:0; display:flex; justify-content:center; padding: 12px; }
+.slides { display:flex; gap:8px; background: rgba(0,0,0,.4); padding:8px; border-radius:12px; backdrop-filter: blur(6px); }
+.slide { width:56px; height:56px; border-radius:8px; background-size:cover; background-position:center; border:2px solid rgba(255,255,255,.5); }
+.slide.selected { outline:3px solid white; }
+
     </style>
   </head>
   <body>
@@ -227,31 +262,22 @@
         ar-placement="floor"
         ar-scale="fixed"
         ar-dom-overlay="ar-overlay"
-      >
-        <button slot="ar-button" id="ar-start" type="button">
-          <img src="./img/AR in.png" alt="AR 세션 시작">
-        </button>
-        <div id="ar-unsupported">현재 브라우저는 WebXR AR을 지원하지 않습니다.</div>
-        <div slot="ar-prompt" id="ar-prompt">
-          <img src="https://modelviewer.dev/shared-assets/icons/hand.png" alt="AR 조작 안내">
-        </div>
-        <div id="ar-failure" slot="ar-status">AR 추적 문제 발생</div>
+       ar ar-modes="webxr" xr-environment>
+    <button slot="ar-button" id="ar-button" type="button">View in your space</button>
+    <div id="ar-prompt"><img src="https://modelviewer.dev/shared-assets/icons/hand.png" alt="Move phone to find surface"></div>
+    <button id="ar-failure" slot="ar-status">AR is not tracking!</button>
 
-        <div id="ar-overlay" slot="ar-dom-overlay">
-          <button class="control-button" type="button" data-control="mode">
-            애니메이션 모드 전환
-            <span data-status>현재: 체어 모드</span>
-          </button>
-          <button class="control-button" type="button" data-control="texture">
-            텍스처 컬러 순환
-            <span data-status>기본 → Beige → Olive</span>
-          </button>
-          <button class="control-button" type="button" data-control="rotate">
-            90° 회전
-            <span data-status>현재 각도 기준</span>
-          </button>
-        </div>
-      </model-viewer>
+    <div id="ar-overlay" slot="ar-dom-overlay">
+      
+    <div class="slider">
+      <div class="slides">
+        <button class="slide selected" onclick="switchSrc(this, 'Chair')" style="background-image:url('./assets/ShopifyModels/Chair.webp');"></button>
+        <button class="slide" onclick="switchSrc(this, 'Mixer')" style="background-image:url('./assets/ShopifyModels/Mixer.webp');"></button>
+      </div>
+    </div>
+
+    </div>
+</model-viewer>
 
       <div class="controls-grid" id="preview-controls">
         <button class="control-button" type="button" data-control="mode">
@@ -282,11 +308,6 @@
       const arButton = document.querySelector("#ar-start");
       const arUnsupportedMessage = document.getElementById("ar-unsupported");
       const overlayRoot = document.getElementById("ar-overlay");
-      // Prevent XR gesture capture when tapping overlay controls
-      overlayRoot?.querySelectorAll('.control-button')?.forEach((btn) => {
-        btn.addEventListener('beforexrselect', (ev) => ev.preventDefault());
-      });
-
       // WebXR feature configuration so DOM overlay can be requested consistently.
       const XR_REQUIRED_FEATURES = ["hit-test"];
       const XR_DOM_OVERLAY_FEATURE = "dom-overlay";
