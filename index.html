@@ -153,14 +153,20 @@
       }
 
       #ar-overlay {
-        position: absolute;
+        position: fixed;
         inset: 0;
-        display: flex;
+        display: none;
         flex-direction: column;
         justify-content: flex-end;
         padding: 16px;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
         gap: 12px;
         pointer-events: auto;
+        z-index: 10;
+      }
+
+      #ar-overlay.dom-overlay-active {
+        display: flex;
       }
 
       #ar-overlay .control-button {
@@ -226,7 +232,7 @@
         </div>
         <div id="ar-failure" slot="ar-status">AR 추적 문제 발생</div>
 
-        <div id="ar-overlay" slot="ar-dom-overlay">
+        <div id="ar-overlay" slot="ar-dom-overlay" hidden>
           <button class="control-button" type="button" data-control="mode">
             애니메이션 모드 전환
             <span data-status>현재: 체어 모드</span>
@@ -270,15 +276,23 @@
       const rotateButtons = Array.from(document.querySelectorAll('button[data-control="rotate"]'));
       const arButton = document.querySelector("#ar-start");
       const arUnsupportedMessage = document.getElementById("ar-unsupported");
-      const overlayRoot = modelViewer?.querySelector("#ar-overlay");
+      const overlayRoot = document.getElementById("ar-overlay");
       // WebXR feature configuration so DOM overlay can be requested consistently.
       const XR_REQUIRED_FEATURES = ["hit-test"];
+      const XR_DOM_OVERLAY_FEATURE = "dom-overlay";
       const XR_BASE_OPTIONAL_FEATURES = ["light-estimation"];
       const DOM_OVERLAY_ACTIVE_CLASS = "dom-overlay-active";
+      let domOverlaySupported = true;
+      const arUnsupportedDefaultText = arUnsupportedMessage?.textContent ?? "";
 
       if (!modelViewer) {
         console.error("model-viewer 요소를 찾을 수 없습니다.");
       }
+      if (!overlayRoot) {
+        console.warn("DOM overlay 루트를 찾을 수 없습니다. AR 세션에서 HTML overlay를 사용할 수 없습니다.");
+        domOverlaySupported = false;
+      }
+      ensureArButtonVisibility();
 
       // 한국어 주석: 사용자 정의 가능한 카메라 줌 범위(단위: 미터). 필요 시 값만 수정하세요.
       const MIN_CAMERA_DISTANCE = 1.4;
@@ -450,31 +464,38 @@
       function ensureArButtonVisibility() {
         if (!arButton) return;
         arButton.style.display = "inline-flex";
-        if (!modelViewer?.canActivateAR) {
+        if (!modelViewer?.canActivateAR || !domOverlaySupported) {
           arButton.setAttribute("disabled", "disabled");
-          arButton.title = "지원되지 않는 환경입니다.";
+          arButton.title = domOverlaySupported
+            ? "지원되지 않는 환경입니다."
+            : "이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.";
           if (arUnsupportedMessage) {
+            arUnsupportedMessage.textContent = domOverlaySupported
+              ? arUnsupportedDefaultText
+              : "이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.";
             arUnsupportedMessage.style.display = "block";
           }
         } else {
           arButton.removeAttribute("disabled");
           arButton.title = "AR 세션 시작";
           if (arUnsupportedMessage) {
+            arUnsupportedMessage.textContent = arUnsupportedDefaultText;
             arUnsupportedMessage.style.display = "none";
           }
         }
       }
 
       function buildArSessionOptions() {
+        const requiredFeatures = new Set(XR_REQUIRED_FEATURES);
         const optionalFeatures = new Set(XR_BASE_OPTIONAL_FEATURES);
         const sessionOptions = {
           xrSessionMode: "immersive-ar",
-          requiredFeatures: XR_REQUIRED_FEATURES,
         };
         if (overlayRoot) {
-          optionalFeatures.add("dom-overlay");
+          requiredFeatures.add(XR_DOM_OVERLAY_FEATURE);
           sessionOptions.domOverlay = { root: overlayRoot };
         }
+        sessionOptions.requiredFeatures = Array.from(requiredFeatures);
         sessionOptions.optionalFeatures = Array.from(optionalFeatures);
         return sessionOptions;
       }
@@ -485,12 +506,16 @@
         const status = typeof detail === "string" ? detail : detail?.status;
         if (status === "session-started") {
           overlayRoot.classList.add(DOM_OVERLAY_ACTIVE_CLASS);
+          overlayRoot.removeAttribute("hidden");
           const domOverlayState = modelViewer?.xrSession?.domOverlayState;
           if (!domOverlayState) {
             console.warn("DOM overlay was requested but is not available in this XR session.");
+          } else if (domOverlayState?.type) {
+            console.info(`DOM overlay type: ${domOverlayState.type}`);
           }
-        } else if (status === "not-presenting") {
+        } else if (status === "not-presenting" || status === "failed" || status === "session-ended") {
           overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
+          overlayRoot.setAttribute("hidden", "hidden");
         }
       }
 
@@ -505,7 +530,22 @@
           const sessionOptions = buildArSessionOptions();
           await modelViewer.enterAR(sessionOptions);
         } catch (error) {
-          console.error("AR 세션 진입에 실패했습니다:", error);
+          if (error?.name === "NotSupportedError" || /\bdom[- ]?overlay\b/i.test(error?.message ?? "")) {
+            console.error("이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.", error);
+            domOverlaySupported = false;
+            if (overlayRoot) {
+              overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
+              overlayRoot.setAttribute("hidden", "hidden");
+            }
+            if (arUnsupportedMessage) {
+              arUnsupportedMessage.textContent = "이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.";
+              arUnsupportedMessage.style.display = "block";
+            }
+            arButton?.setAttribute("disabled", "disabled");
+            ensureArButtonVisibility();
+          } else {
+            console.error("AR 세션 진입에 실패했습니다:", error);
+          }
         }
       });
 
