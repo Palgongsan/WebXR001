@@ -69,8 +69,7 @@
       #ar-start {
         position: absolute;
         bottom: clamp(12px, 2vw, 20px);
-        left: 50%;
-        transform: translateX(-50%);
+        right: 30px;
         padding: 0;
         border: none;
         background: transparent;
@@ -79,6 +78,7 @@
         justify-content: center;
         pointer-events: auto;
         cursor: pointer;
+        transform: none;
       }
 
       #ar-start[disabled] {
@@ -88,7 +88,7 @@
 
       #ar-start img {
         display: block;
-        width: clamp(140px, 18vw, 180px);
+        width: clamp(105px, 13.5vw, 135px);
         height: auto;
       }
 
@@ -270,6 +270,7 @@
       const rotateButtons = Array.from(document.querySelectorAll('button[data-control="rotate"]'));
       const arButton = document.querySelector("#ar-start");
       const arUnsupportedMessage = document.getElementById("ar-unsupported");
+      const overlayRoot = modelViewer?.querySelector("#ar-overlay");
 
       if (!modelViewer) {
         console.error("model-viewer 요소를 찾을 수 없습니다.");
@@ -467,7 +468,14 @@
           return;
         }
         try {
-          await modelViewer.enterAR();
+          const sessionOptions = {
+            xrSessionMode: "immersive-ar",
+          };
+          if (overlayRoot) {
+            sessionOptions.domOverlay = { root: overlayRoot };
+            sessionOptions.optionalFeatures = ["dom-overlay"];
+          }
+          await modelViewer.enterAR(sessionOptions);
         } catch (error) {
           console.error("AR 세션 진입에 실패했습니다:", error);
         }
