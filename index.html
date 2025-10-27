@@ -6,8 +6,7 @@
     <title>CERAGEM V11 WebXR Demo</title>
     <meta name="description" content="CERAGEM V11 제품을 WebXR 기반 AR 환경에서 체험하며 모드, 재질, 회전을 제어할 수 있는 프로토타입">
     <!-- 한국어 주석: CORS 이슈 방지를 위해 로컬에 저장한 model-viewer 모듈 사용 -->
-    <!-- original local script replaced for debug: <script type="module" src="./libs/model-viewer.min.js"></script> -->
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 <script nomodule src="https://unpkg.com/@google/model-viewer/dist/model-viewer-legacy.js"></script>
     <style>
       :root {
@@ -202,28 +201,9 @@
         }
       }
     
-/* === FORCE VISIBILITY FOR AR UI (debug) === */
-#ar-button,
-[slot="ar-button"]#ar-start,
-model-viewer ::slotted(#ar-button) {
-  position: absolute;
-  left: 50%; transform: translateX(-50%);
-  bottom: 16px;
-  display: inline-flex !important;
-  align-items: center; gap: 8px;
-  background: #ffffff; color: #111; border: 0; border-radius: 20px;
-  padding: 10px 16px; font-weight: 700; z-index: 10000;
-  box-shadow: 0 4px 20px rgba(0,0,0,.18);
-}
-#ar-button img { height: 24px; }
-/* Make overlay clickable and above XR surface */
-#ar-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 10000; }
-#ar-overlay * { pointer-events: auto; }
-model-viewer[ar-status="session-started"] #ar-overlay,
-model-viewer[ar-status="object-placed"]   #ar-overlay { display: flex !important; }
-model-viewer[ar-status="failed"]          #ar-overlay { display: none !important; }
-/* Also keep legacy class path */
-#ar-overlay.dom-overlay-active { display: flex !important; }
+/* Debug: ensure overlay/UI are above AR */
+#ar-overlay { z-index: 9999; }
+[slot="ar-button"], #ar-button, #ar-start { z-index: 10000; position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; }
 
     </style>
   </head>
@@ -303,6 +283,15 @@ model-viewer[ar-status="failed"]          #ar-overlay { display: none !important
       const arButton = document.querySelector("#ar-start");
       const arUnsupportedMessage = document.getElementById("ar-unsupported");
       const overlayRoot = document.getElementById("ar-overlay");
+overlayRoot?.addEventListener('beforexrselect', (ev)=>ev.preventDefault());
+
+      // Permissions-Policy probe: if embedded, ensure iframe allows 'xr-spatial-tracking' and 'camera'
+      try {
+        if (window.top !== window) {
+          console.warn('[WebXR] This page appears embedded in an iframe. Ensure the iframe has: allow="xr-spatial-tracking; camera; microphone; gyroscope; accelerometer"');
+        }
+      } catch(e) {}
+
       // WebXR feature configuration so DOM overlay can be requested consistently.
       const XR_REQUIRED_FEATURES = ["hit-test"];
       const XR_DOM_OVERLAY_FEATURE = "dom-overlay";
@@ -554,7 +543,7 @@ model-viewer[ar-status="failed"]          #ar-overlay { display: none !important
         }
         try {
           const sessionOptions = buildArSessionOptions();
-          await modelViewer.enterAR();
+          await modelViewer.enterAR({requiredFeatures:['hit-test','dom-overlay'], optionalFeatures:['light-estimation'], domOverlay:{root: overlayRoot}});
         } catch (error) {
           if (error?.name === "NotSupportedError" || /\bdom[- ]?overlay\b/i.test(error?.message ?? "")) {
             console.error("이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.", error);
@@ -577,55 +566,5 @@ model-viewer[ar-status="failed"]          #ar-overlay { display: none !important
 
       // 한국어 주석: 치수 기능은 비활성화 상태로 유지
     </script>
-  
-<!-- Fallback AR button (outside model-viewer) for environments hiding slot UI) -->
-<button id="fallback-ar" style="position:fixed;right:16px;bottom:16px;z-index:10001;
-  background:#111;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;">
-  AR 시작(백업)
-</button>
-<!-- Tiny AR debug HUD -->
-<div id="ar-hud" style="position:fixed;left:10px;top:10px;z-index:10002;background:rgba(0,0,0,.6);
-  color:#fff;padding:8px 10px;border-radius:8px;font:12px/1.3 system-ui;">
-  <div>status: <span id="hud-status">-</span></div>
-  <div>canActivateAR: <span id="hud-can">-</span></div>
-  <div>domOverlayState: <span id="hud-overlay">-</span></div>
-</div>
-
-
-<script>
-(function(){
-  const mv = document.getElementById('cera-viewer') || document.querySelector('model-viewer');
-  const fallback = document.getElementById('fallback-ar');
-  const overlay = document.getElementById('ar-overlay');
-  const hud = {
-    status: document.getElementById('hud-status'),
-    can: document.getElementById('hud-can'),
-    overlay: document.getElementById('hud-overlay')
-  };
-
-  function refreshHUD(){
-    try {
-      hud.status.textContent = mv?.getAttribute('ar-status') ?? '-';
-      hud.can.textContent = mv?.canActivateAR ? 'true' : 'false';
-      const t = mv?.xrSession?.domOverlayState?.type ?? 'none';
-      hud.overlay.textContent = t;
-    } catch(e){}
-  }
-  refreshHUD();
-  setInterval(refreshHUD, 500);
-
-  // Always allow entering AR via fallback button
-  fallback?.addEventListener('click', async (e)=>{
-    e.preventDefault();
-    try { await mv?.enterAR?.(); } catch(err){ console.warn('fallback enterAR error', err); }
-  });
-
-  // Prevent XR gesture capture on overlay buttons
-  overlay?.addEventListener('beforexrselect', ev => ev.preventDefault());
-
-  mv?.addEventListener('ar-status', refreshHUD);
-})();
-</script>
-
-</body>
+  </body>
 </html>
