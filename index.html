@@ -58,7 +58,7 @@
         min-height: clamp(420px, 60vh, 720px);
         border-radius: 24px;
         background: var(--surface);
-        border: 0px solid var(--border);
+        border: 1px solid var(--border);
         --poster-color: #eef0f6;
         --progress-bar-height: 4px;
         --progress-bar-color: rgba(47, 84, 235, 0.7);
@@ -168,7 +168,7 @@
       #ar-overlay.dom-overlay-active {
         display: flex;
       }
-      /* Show overlay while AR session is active via model-viewer state */
+      /* Also show overlay based on <model-viewer> ar-status */
       model-viewer[ar-status="session-started"] #ar-overlay,
       model-viewer[ar-status="object-placed"] #ar-overlay { display: flex; }
       model-viewer[ar-status="failed"] #ar-overlay { display: none; }
@@ -226,7 +226,7 @@
         ar-modes="webxr"
         ar-placement="floor"
         ar-scale="fixed"
-        
+        ar-dom-overlay="ar-overlay"
       >
         <button slot="ar-button" id="ar-start" type="button">
           <img src="./img/AR in.png" alt="AR 세션 시작">
@@ -282,11 +282,11 @@
       const arButton = document.querySelector("#ar-start");
       const arUnsupportedMessage = document.getElementById("ar-unsupported");
       const overlayRoot = document.getElementById("ar-overlay");
-
       // Prevent XR gesture capture when tapping overlay controls
       overlayRoot?.querySelectorAll('.control-button')?.forEach((btn) => {
         btn.addEventListener('beforexrselect', (ev) => ev.preventDefault());
       });
+
       // WebXR feature configuration so DOM overlay can be requested consistently.
       const XR_REQUIRED_FEATURES = ["hit-test"];
       const XR_DOM_OVERLAY_FEATURE = "dom-overlay";
