@@ -271,6 +271,10 @@
       const arButton = document.querySelector("#ar-start");
       const arUnsupportedMessage = document.getElementById("ar-unsupported");
       const overlayRoot = modelViewer?.querySelector("#ar-overlay");
+      // WebXR feature configuration so DOM overlay can be requested consistently.
+      const XR_REQUIRED_FEATURES = ["hit-test"];
+      const XR_BASE_OPTIONAL_FEATURES = ["light-estimation"];
+      const DOM_OVERLAY_ACTIVE_CLASS = "dom-overlay-active";
 
       if (!modelViewer) {
         console.error("model-viewer 요소를 찾을 수 없습니다.");
@@ -308,8 +312,9 @@
         applyCameraConstraints();
       });
 
-      modelViewer?.addEventListener("ar-status", () => {
+      modelViewer?.addEventListener("ar-status", (event) => {
         ensureArButtonVisibility();
+        updateOverlayPresentationState(event);
       });
 
       modeButtons.forEach((button) => {
@@ -460,6 +465,35 @@
         }
       }
 
+      function buildArSessionOptions() {
+        const optionalFeatures = new Set(XR_BASE_OPTIONAL_FEATURES);
+        const sessionOptions = {
+          xrSessionMode: "immersive-ar",
+          requiredFeatures: XR_REQUIRED_FEATURES,
+        };
+        if (overlayRoot) {
+          optionalFeatures.add("dom-overlay");
+          sessionOptions.domOverlay = { root: overlayRoot };
+        }
+        sessionOptions.optionalFeatures = Array.from(optionalFeatures);
+        return sessionOptions;
+      }
+
+      function updateOverlayPresentationState(event) {
+        if (!overlayRoot) return;
+        const detail = event?.detail;
+        const status = typeof detail === "string" ? detail : detail?.status;
+        if (status === "session-started") {
+          overlayRoot.classList.add(DOM_OVERLAY_ACTIVE_CLASS);
+          const domOverlayState = modelViewer?.xrSession?.domOverlayState;
+          if (!domOverlayState) {
+            console.warn("DOM overlay was requested but is not available in this XR session.");
+          }
+        } else if (status === "not-presenting") {
+          overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
+        }
+      }
+
       arButton?.addEventListener("click", async (event) => {
         event.preventDefault();
         if (!modelViewer) return;
@@ -468,13 +502,7 @@
           return;
         }
         try {
-          const sessionOptions = {
-            xrSessionMode: "immersive-ar",
-          };
-          if (overlayRoot) {
-            sessionOptions.domOverlay = { root: overlayRoot };
-            sessionOptions.optionalFeatures = ["dom-overlay"];
-          }
+          const sessionOptions = buildArSessionOptions();
           await modelViewer.enterAR(sessionOptions);
         } catch (error) {
           console.error("AR 세션 진입에 실패했습니다:", error);
