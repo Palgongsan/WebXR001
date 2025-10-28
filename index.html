@@ -2,20 +2,21 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-  <title>WebXR Demo — modelviewer.dev UI mimicc</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>WebXR Demo — modelviewer.dev UI mimic (Inline Cube)</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <script nomodule src="https://unpkg.com/@google/model-viewer/dist/model-viewer-legacy.js"></script>
   <style>
     :root { color-scheme: light; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#f5f6f8; }
     main { display:grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
-    .copy { padding: 32px; background:#f6f7fb; }
+    @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+    .copy { padding: 32px; }
     .copy h1 { margin:0 0 12px; font-size: 28px; }
     .copy p { line-height:1.55; color:#444; }
-    model-viewer { width: 100%; height: 100vh; display:block; background:#fff; --poster-color:transparent; }
+    model-viewer { width: 100%; height: 100vh; display:block; background:#fff; --poster-color: #ffffff; border-left:1px solid #e5e7eb; position: relative; }
 
-    /* Example-like UI */
+    /* example-like UI */
     #ar-button {
       position:absolute; left:50%; transform:translateX(-50%); bottom:16px;
       background:#fff; color:#111; border:0; border-radius:20px; padding:10px 16px; font-weight:700; z-index:5;
@@ -24,7 +25,7 @@
     }
     #ar-button img { height:24px; }
     #ar-prompt { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; pointer-events:none; z-index:4; }
-    #ar-prompt img { animation:pulse 2s infinite ease-in-out; }
+    #ar-prompt img { height:48px; animation:pulse 2s infinite ease-in-out; }
     @keyframes pulse {
       from { transform:translate(-50%,-50%) scale(1); opacity:.9; }
       50%  { transform:translate(-50%,-50%) scale(1.08); opacity:.6; }
@@ -44,6 +45,9 @@
     .slides { display:flex; gap:8px; background:rgba(0,0,0,.4); padding:8px; border-radius:12px; backdrop-filter: blur(6px); }
     .slide { width:56px; height:56px; border-radius:8px; background-size:cover; background-position:center; border:2px solid rgba(255,255,255,.6); outline:none; }
     .slide.selected { outline:3px solid #fff; }
+
+    /* helper to visualize viewer area */
+    .mv-frame::after { content:""; position:absolute; inset:0; pointer-events:none; box-shadow: inset 0 0 0 2px rgba(0,0,0,.05); }
   </style>
 </head>
 <body>
@@ -51,13 +55,15 @@
     <section class="copy">
       <h1>WebXR Demo</h1>
       <p>Customize a WebXR Augmented Reality session with HTML, CSS, and JS in Chrome 83+ on Android.</p>
-      <p>이 페이지는 <code>modelviewer.dev</code>의 AR 예제 UI를 모방한 테스트 파일입니다. DOM Overlay 검증을 위해 3D 모델은 데이터 URI로 인라인된 간단한 삼각형으로 대체했습니다.</p>
+      <p>이 페이지는 modelviewer.dev의 AR 예제 UI를 모방한 테스트 파일입니다. 외부 리소스 없이 <strong>인라인 glTF(빨간 큐브)</strong>를 사용합니다.</p>
       <pre style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;overflow:auto;">&lt;model-viewer ar ar-modes="webxr" ...&gt; ... &lt;/model-viewer&gt;</pre>
     </section>
 
-    <model-viewer id="mv"
-      src="data:model/gltf+json;base64,eyJhc3NldCI6IHsidmVyc2lvbiI6ICIyLjAifSwgInNjZW5lcyI6IFt7Im5vZGVzIjogWzBdfV0sICJzY2VuZSI6IDAsICJub2RlcyI6IFt7Im1lc2giOiAwfV0sICJtZXNoZXMiOiBbeyJwcmltaXRpdmVzIjogW3siYXR0cmlidXRlcyI6IHsiUE9TSVRJT04iOiAwfSwgImluZGljZXMiOiAxLCAibW9kZSI6IDR9XX1dLCAiYnVmZmVycyI6IFt7ImJ5dGVMZW5ndGgiOiA0MiwgInVyaSI6ICJkYXRhOmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbTtiYXNlNjQsQUFBQUFBQUFBQUFBQUFBQUFBQUFQd0FBQUFBQUFBQUFBQUFBQUFBQUFEOEFBQUFBQUFBQkFBSUEifV0sICJidWZmZXJWaWV3cyI6IFt7ImJ1ZmZlciI6IDAsICJieXRlT2Zmc2V0IjogMCwgImJ5dGVMZW5ndGgiOiAzNiwgInRhcmdldCI6IDM0OTYyfSwgeyJidWZmZXIiOiAwLCAiYnl0ZU9mZnNldCI6IDM2LCAiYnl0ZUxlbmd0aCI6IDYsICJ0YXJnZXQiOiAzNDk2M31dLCAiYWNjZXNzb3JzIjogW3siYnVmZmVyVmlldyI6IDAsICJieXRlT2Zmc2V0IjogMCwgImNvbXBvbmVudFR5cGUiOiA1MTI2LCAiY291bnQiOiAzLCAidHlwZSI6ICJWRUMzIiwgIm1pbiI6IFswLjAsIDAuMCwgMC4wXSwgIm1heCI6IFswLjUsIDAuNSwgMC4wXX0sIHsiYnVmZmVyVmlldyI6IDEsICJieXRlT2Zmc2V0IjogMCwgImNvbXBvbmVudFR5cGUiOiA1MTIzLCAiY291bnQiOiAzLCAidHlwZSI6ICJTQ0FMQVIifV19"
-      alt="Inline triangle"
+    <model-viewer id="mv" class="mv-frame"
+      src="data:model/gltf+json;base64,eyJhc3NldCI6IHsidmVyc2lvbiI6ICIyLjAifSwgInNjZW5lcyI6IFt7Im5vZGVzIjogWzBdfV0sICJzY2VuZSI6IDAsICJub2RlcyI6IFt7Im1lc2giOiAwfV0sICJtZXNoZXMiOiBbeyJwcmltaXRpdmVzIjogW3siYXR0cmlidXRlcyI6IHsiUE9TSVRJT04iOiAwfSwgImluZGljZXMiOiAxLCAibWF0ZXJpYWwiOiAwLCAibW9kZSI6IDR9XX1dLCAibWF0ZXJpYWxzIjogW3sicGJyTWV0YWxsaWNSb3VnaG5lc3MiOiB7ImJhc2VDb2xvckZhY3RvciI6IFswLjksIDAuMiwgMC4yLCAxLjBdLCAibWV0YWxsaWNGYWN0b3IiOiAwLjAsICJyb3VnaG5lc3NGYWN0b3IiOiAxLjB9fV0sICJidWZmZXJzIjogW3siYnl0ZUxlbmd0aCI6IDE2OCwgInVyaSI6ICJkYXRhOmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbTtiYXNlNjQsQUFBQUFBQUFBQUFBQUFBQUFBQ0FQd0FBQUFBQUFBQUFBQUNBUHdBQWdEOEFBQUFBQUFBQUFBQUFnRDhBQUFBQUFBQUFBQUFBQUFBQUFJQS9BQUNBUHdBQUFBQUFBSUEvQUFDQVB3QUFnRDhBQUlBL0FBQUFBQUFBZ0Q4QUFJQS9BQUFCQUFJQUFBQUNBQU1BQkFBR0FBVUFCQUFIQUFZQUFBQUVBQVVBQUFBRkFBRUFBd0FDQUFZQUF3QUdBQWNBQVFBRkFBWUFBUUFHQUFJQUFBQURBQWNBQUFBSEFBUUEifV0sICJidWZmZXJWaWV3cyI6IFt7ImJ1ZmZlciI6IDAsICJieXRlT2Zmc2V0IjogMCwgImJ5dGVMZW5ndGgiOiA5NiwgInRhcmdldCI6IDM0OTYyfSwgeyJidWZmZXIiOiAwLCAiYnl0ZU9mZnNldCI6IDk2LCAiYnl0ZUxlbmd0aCI6IDcyLCAidGFyZ2V0IjogMzQ5NjN9XSwgImFjY2Vzc29ycyI6IFt7ImJ1ZmZlclZpZXciOiAwLCAiYnl0ZU9mZnNldCI6IDAsICJjb21wb25lbnRUeXBlIjogNTEyNiwgImNvdW50IjogOCwgInR5cGUiOiAiVkVDMyIsICJtaW4iOiBbMC4wLCAwLjAsIDAuMF0sICJtYXgiOiBbMS4wLCAxLjAsIDEuMF19LCB7ImJ1ZmZlclZpZXciOiAxLCAiYnl0ZU9mZnNldCI6IDAsICJjb21wb25lbnRUeXBlIjogNTEyMywgImNvdW50IjogMzYsICJ0eXBlIjogIlNDQUxBUiJ9XX0="
+      exposure="1.0"
+      environment-image="neutral"
+      alt="Inline cube"
       camera-controls
       touch-action="pan-y"
       ar
@@ -97,7 +103,7 @@
     // Prevent XR gesture capture on overlay
     document.querySelector('.slider')?.addEventListener('beforexrselect', (ev) => ev.preventDefault());
 
-    // In this mimic demo, switching boxes just toggles a selected class (same inline model)
+    // Demo: UI only toggles selection (model is fixed)
     window.switchBox = (btn) => {
       document.querySelectorAll('.slide').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
