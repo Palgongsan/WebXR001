@@ -114,6 +114,21 @@
             />
           </button>
 
+          <!--
+            slot="ar-button" 커스텀 AR 진입 버튼
+            - modelviewer.dev 예제를 참고해 이미지 기반 버튼으로 구성
+            - 위치/크기는 styles.css의 .ar-entry-button CSS 커스텀 프로퍼티로 손쉽게 조정 가능
+          -->
+          <button
+            id="custom-ar-button"
+            class="ar-entry-button"
+            slot="ar-button"
+            type="button"
+            aria-label="AR 세션 시작"
+          >
+            <img src="img/AR in.png" alt="AR 세션 진입" />
+          </button>
+
         </model-viewer>
       </main>
     </div>

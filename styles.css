@@ -45,6 +45,38 @@ model-viewer {
   background: #ffffff;
 }
 
+.ar-entry-button {
+  position: absolute;
+  top: var(--ar-button-top, 24px);
+  right: var(--ar-button-right, 24px);
+  width: var(--ar-button-size, 72px);
+  height: var(--ar-button-size, 72px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 160ms ease;
+}
+
+.ar-entry-button:hover,
+.ar-entry-button:focus-visible {
+  transform: scale(1.05);
+  outline: none;
+}
+
+.ar-entry-button img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
 .overlay-control {
   width: 64px;
   height: 64px;
@@ -178,4 +210,11 @@ model-viewer {
     transform: scale(0.95);
     opacity: 0.6;
   }
+}
+
+/* AR 세션 진입 시 표시되는 기본 바닥 리테일(사각형/원형)을 임시로 숨김 처리 */
+model-viewer::part(ar-hit-test-icon),
+model-viewer::part(ar-hit-test-dot),
+model-viewer::part(ar-hit-test-ring) {
+  display: none !important;
 }
