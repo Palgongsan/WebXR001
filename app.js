@@ -1,11 +1,10 @@
-/**
+﻿/**
  * 세라젬 V11 WebXR 최소 제어 스크립트
  * - 애니메이션 토글(0.3초 블렌딩), 디퓨즈 텍스처 순환, 모델 회전(Z축 90°)만 유지한다.
  * - DOM Overlay는 slot="ar-dom-overlay"로 직접 부착되어 있어 별도 이동 로직이 필요 없다.
  */
 
 const modelViewer = document.querySelector("#catalog-viewer");
-const arOverlay = document.querySelector("#ar-overlay");
 const overlayHost = document.querySelector("#overlay-host");
 const arOverlay = document.querySelector("#ar-overlay");
 const animationToggleButton = document.querySelector("#animation-toggle-button");
@@ -304,3 +303,10 @@ async function getTextureForUri(uri) {
 // 초기 동작 준비
 restoreOverlayToHost();
 preloadVariantTextures();
+
+
+
+
+
+
+
