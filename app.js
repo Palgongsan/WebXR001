@@ -1,11 +1,11 @@
 /**
  * 세라젬 V11 WebXR DOM Overlay 제어 스크립트
  * ---------------------------------------------------------------------------
- * - root/ref/ar-barebones.html에서 소개한 WebXR 세션 흐름(지원 여부 확인 → dom-overlay
- *   옵션 요청 → 세션 종료 처리)을 <model-viewer> 편의 API(enterAR)를 통해 래핑하였다.
- * - DOM Overlay는 slot="ar-dom-overlay" 요소를 세션 시작 직전에 <model-viewer> 내부로
- *   이동시키고, 종료 시 다시 overlay-host로 복귀시켜 일반 웹/AR 모두에서 UI를 유지한다.
- * - 모든 사용자 상호작용 요소는 beforexrselect 이벤트를 사용하여 XR 제스처 충돌을 방지한다.
+ * - root/ref/ar-barebones.html의 WebXR 세션 흐름을 참고하여, <model-viewer>의 enterAR()
+ *   유틸리티와 DOM Overlay 슬롯을 조합한 구현이다.
+ * - DOM Overlay 루트(#ar-overlay)는 평상시 overlay-host 안에 두고, AR 세션 직전에만
+ *   <model-viewer> 내부로 이동시켜 domOverlay 옵션을 충족한다.
+ * - 각 UI 요소는 beforexrselect 이벤트에서 기본 제스처를 취소하여 XR 입력과의 충돌을 막는다.
  */
 
 const modelViewer = document.querySelector("#catalog-viewer");
@@ -27,21 +27,13 @@ const dimHeightEl = document.querySelector("#dim-height");
 const dimDepthEl = document.querySelector("#dim-depth");
 const cameraToast = document.querySelector("#camera-toast");
 
-const textureCache = new Map(); // model-viewer.createTexture() 결과 재사용
+const textureCache = new Map(); // model-viewer.createTexture() 결과 캐싱
 
-// 애니메이션 상태에 따라 UI 썸네일/라벨을 매핑한다.
 const ANIMATION_STATE_MAP = {
-  chair: {
-    label: "체어 모드",
-    thumb: "img/V11_thumbnail.webp",
-  },
-  stretch: {
-    label: "스트레치 모드",
-    thumb: "img/V11_stretch_thumbnail.webp",
-  },
+  chair: { label: "체어 모드", thumb: "img/V11_thumbnail.webp" },
+  stretch: { label: "스트레치 모드", thumb: "img/V11_stretch_thumbnail.webp" },
 };
 
-// 디퓨즈 텍스처 순환 정의 (null은 GLB 기본 텍스처 유지)
 const TEXTURE_SEQUENCE = [
   { id: "original", label: "기본 텍스처", uri: null },
   { id: "beige", label: "CERA V11 Beige", uri: "texture/CERA_V11_low_D_Beige.png" },
@@ -50,7 +42,7 @@ const TEXTURE_SEQUENCE = [
 
 let currentTextureIndex = 0;
 let baseMaterial = null;
-let baseColorTexture = null;
+let baseColorTextureInfo = null;
 let originalBaseTexture = null;
 let chairAnimationName = null;
 let stretchAnimationName = null;
@@ -67,9 +59,6 @@ const rotationState = {
 let dimensionLoopId = null;
 let arSessionHasShownToast = false;
 
-/**
- * VR/AR 제스처와의 충돌을 방지하기 위해 overlay 상호작용에 XR 선택을 차단한다.
- */
 function preventXRSelect(event) {
   event.preventDefault();
 }
@@ -77,12 +66,6 @@ function preventXRSelect(event) {
 arOverlay.addEventListener("beforexrselect", preventXRSelect);
 hotspotButton.addEventListener("beforexrselect", preventXRSelect);
 
-/**
- * DOM Overlay 위치 제어:
- * - 기본 상태: overlay-host 안에서 일반 DOM UI로 표시
- * - AR 세션 시작 직전: <model-viewer> 내부로 이동시켜 slot="ar-dom-overlay" 활성화
- * - 세션 종료/실패 시 overlay-host로 복귀
- */
 function attachOverlayToModelViewer() {
   if (!modelViewer.contains(arOverlay)) {
     modelViewer.appendChild(arOverlay);
@@ -95,9 +78,6 @@ function restoreOverlayToHost() {
   }
 }
 
-/**
- * 모델 로딩 완료 시점에 재질/애니메이션/치수 정보를 확보한다.
- */
 modelViewer.addEventListener("load", () => {
   captureBaseMaterial();
   detectAnimations();
@@ -107,16 +87,10 @@ modelViewer.addEventListener("load", () => {
   preloadVariantTextures();
 });
 
-/**
- * 애니메이션 재생이 끝나면 마지막 포즈에서 멈추도록 pause 처리.
- */
 modelViewer.addEventListener("finished", () => {
   modelViewer.pause();
 });
 
-/**
- * AR 상태 변경 시 HUD, 버튼, DOM Overlay 위치를 업데이트한다.
- */
 modelViewer.addEventListener("ar-status", (event) => {
   const status = event.detail.status;
   const reason = event.detail.reason ?? "";
@@ -129,7 +103,7 @@ modelViewer.addEventListener("ar-status", (event) => {
 
     const overlayType = modelViewer.xrSession?.domOverlayState?.type ?? "미확인";
     domOverlayStateEl.textContent = overlayType;
-    console.info(`[DOMOverlay] 세션에 연결된 유형: ${overlayType}`);
+    console.info(`[DOMOverlay] 유형: ${overlayType}`);
 
     enterARButton.innerHTML = `<img src="img/AR in.png" alt="" aria-hidden="true" /><span>AR 종료</span>`;
     enterARButton.setAttribute("aria-label", "AR 세션 종료");
@@ -152,9 +126,6 @@ modelViewer.addEventListener("ar-status", (event) => {
   }
 });
 
-/**
- * AR 버튼 클릭 시 세션 진입/종료를 전환한다.
- */
 enterARButton.addEventListener("click", async () => {
   const status = arOverlay.dataset.arStatus;
 
@@ -164,7 +135,7 @@ enterARButton.addEventListener("click", async () => {
   }
 
   if (!modelViewer.canActivateAR) {
-    sessionStatusEl.textContent = "AR 미지원 환경 (HTTPS + 호환 브라우저 필요)";
+    sessionStatusEl.textContent = "AR 미지원 환경 (HTTPS + 호환 기기 필요)";
     domOverlayStateEl.textContent = "지원되지 않음";
     return;
   }
@@ -180,12 +151,9 @@ enterARButton.addEventListener("click", async () => {
   }
 });
 
-/**
- * 애니메이션 토글: ChairMode ↔ Stretch 모드를 3초 블렌딩 후 정지 상태로 유지.
- */
 function toggleAnimation() {
   if (!chairAnimationName || !stretchAnimationName) {
-    console.warn("애니메이션 이름을 찾지 못했습니다. GLB 애니메이션 명칭 확인 필요.");
+    console.warn("애니메이션 이름을 찾지 못했습니다. GLB 애니메이션 구성을 확인하세요.");
     return;
   }
 
@@ -205,8 +173,7 @@ animationToggleButton.addEventListener("click", toggleAnimation);
 hotspotButton.addEventListener("click", toggleAnimation);
 
 /**
- * 디퓨즈 텍스처 순환 처리: createTexture() + setBaseColorTexture()
- * - null 항목이면 originalBaseTexture로 복원한다.
+ * 디퓨즈 텍스처 순환 처리 (기본 → Beige → Olive → 기본).
  */
 colorCycleButton.addEventListener("click", async () => {
   if (!baseMaterial) {
@@ -232,9 +199,6 @@ colorCycleButton.addEventListener("click", async () => {
   );
 });
 
-/**
- * 모델 회전: Y축 기준 90°씩 누적 회전, easeInOutCubic으로 0.3초 애니메이션.
- */
 rotateButton.addEventListener("click", () => {
   startRotationAnimation(rotationState.currentY, rotationState.currentY + 90);
 });
@@ -280,7 +244,8 @@ function cancelRotationAnimation() {
 }
 
 function applyModelRotation(yawDeg) {
-  modelViewer.setAttribute("model-rotation", `0deg ${yawDeg.toFixed(2)}deg 0deg`);
+  modelViewer.setAttribute("orientation", `0deg ${yawDeg.toFixed(2)}deg 0deg`);
+  modelViewer.requestRender?.();
 }
 
 function normalizeDegrees(value) {
@@ -299,17 +264,11 @@ function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-/**
- * 노출 슬라이더 → model-viewer의 exposure 속성에 연결.
- */
 exposureSlider.addEventListener("input", (event) => {
   const value = Number.parseFloat(event.target.value);
   modelViewer.exposure = Number.isFinite(value) ? value : 1;
 });
 
-/**
- * 사용자 상호작용 시 치수 HUD 표시, 종료 시 숨김.
- */
 modelViewer.addEventListener("interaction-start", () => {
   dimensionPanel.classList.add("visible");
   dimensionPanel.setAttribute("aria-hidden", "false");
@@ -341,7 +300,7 @@ function stopDimensionLoop() {
 function updateDimensionReadout() {
   const dimensions = modelViewer.getDimensions?.();
   if (!dimensions) {
-    dimWidthEl.textContent = dimHeightEl.textContent = dimDepthEl.textContent = "데이터 없음";
+    dimWidthEl.textContent = dimHeightEl.textContent = dimDepthEl.textContent = "-";
     return;
   }
 
@@ -354,9 +313,6 @@ function formatMetersToCentimeters(value) {
   return `${(value * 100).toFixed(1)} cm`;
 }
 
-/**
- * 모델의 기본 재질/텍스처 정보를 확보한다.
- */
 function captureBaseMaterial() {
   const materials = modelViewer.model?.materials;
   if (!materials || materials.length === 0) {
@@ -365,13 +321,10 @@ function captureBaseMaterial() {
   }
 
   baseMaterial = materials[0];
-  baseColorTexture = baseMaterial.pbrMetallicRoughness?.baseColorTexture ?? null;
-  originalBaseTexture = baseColorTexture?.texture ?? null;
+  baseColorTextureInfo = baseMaterial.pbrMetallicRoughness?.baseColorTexture ?? null;
+  originalBaseTexture = baseColorTextureInfo?.texture ?? null;
 }
 
-/**
- * GLB 내부 애니메이션 이름을 탐색하여 Chair/Stretch 모드를 매핑한다.
- */
 function detectAnimations() {
   const available = modelViewer.availableAnimations || [];
   if (available.length === 0) {
@@ -393,9 +346,6 @@ function detectAnimations() {
   animationState = "chair";
 }
 
-/**
- * 애니메이션 UI(썸네일/라벨/aria)를 현재 상태에 맞춰 갱신.
- */
 function updateAnimationUI() {
   const config = ANIMATION_STATE_MAP[animationState];
   if (!config) return;
@@ -414,9 +364,6 @@ function updateAnimationUI() {
   hotspotButton.setAttribute("aria-label", `AR 공간에서 ${nextStateLabel}로 전환`);
 }
 
-/**
- * 텍스처 프리로드: createTexture()를 미리 호출하여 캐싱.
- */
 function preloadVariantTextures() {
   TEXTURE_SEQUENCE.forEach((texture) => {
     if (!texture.uri) return;
@@ -427,9 +374,6 @@ function preloadVariantTextures() {
   });
 }
 
-/**
- * AR 지원 여부에 따라 진입 버튼 상태를 갱신.
- */
 function updateEnterARAvailability() {
   if (!enterARButton) return;
   if (!("canActivateAR" in modelViewer)) {
@@ -443,18 +387,23 @@ if (navigator.xr?.addEventListener) {
   navigator.xr.addEventListener("devicechange", updateEnterARAvailability);
 }
 
-/**
- * 텍스처 적용 로직: null이면 기본 텍스처 복원, 아니면 캐시된 텍스처 적용.
- */
 async function applyTextureInfo(textureInfo) {
   if (!baseMaterial) {
     throw new Error("재질 정보가 존재하지 않습니다.");
   }
 
+  const pbr = baseMaterial.pbrMetallicRoughness;
+  const slot = pbr?.baseColorTexture ?? baseColorTextureInfo;
+
+  if (!slot || typeof slot.setTexture !== "function") {
+    console.warn("baseColorTexture 슬롯이 없어 텍스처를 교체할 수 없습니다.");
+    return;
+  }
+
   if (!textureInfo || !textureInfo.uri) {
     if (originalBaseTexture) {
-      baseMaterial.pbrMetallicRoughness.setBaseColorTexture(originalBaseTexture);
-      baseColorTexture = baseMaterial.pbrMetallicRoughness.baseColorTexture ?? baseColorTexture;
+      slot.setTexture(originalBaseTexture);
+      modelViewer.requestRender?.();
     } else {
       console.warn("복원할 기본 텍스처가 없습니다.");
     }
@@ -466,34 +415,25 @@ async function applyTextureInfo(textureInfo) {
     throw new Error(`텍스처 로드 실패: ${textureInfo.uri}`);
   }
 
-  baseMaterial.pbrMetallicRoughness.setBaseColorTexture(gltfTexture);
-  baseColorTexture = baseMaterial.pbrMetallicRoughness.baseColorTexture ?? baseColorTexture;
+  slot.setTexture(gltfTexture);
+  baseColorTextureInfo = pbr.baseColorTexture ?? slot;
+  modelViewer.requestRender?.();
 }
 
 async function getTextureForUri(uri) {
-  if (!uri) {
-    return null;
-  }
+  if (!uri) return null;
 
   if (textureCache.has(uri)) {
     return textureCache.get(uri);
   }
 
-  let texture = null;
-  try {
-    texture = await modelViewer.createTexture(uri);
-  } catch (error) {
-    console.error("createTexture 실패:", error);
-    throw error;
-  }
-
+  const texture = await modelViewer.createTexture(uri);
   textureCache.set(uri, texture);
   return texture;
 }
 
-// 초기 상태 정리
 restoreOverlayToHost();
 updateEnterARAvailability();
 updateDimensionReadout();
 
-// TODO: 향후 분석/로그 연동 시 enterAR / texture 교체 등 주요 이벤트 지점을 활용할 것.
+// TODO: 추후 분석/로그 연동 시 enterAR, texture 전환, 회전 이벤트 지점에 로깅을 추가할 것.

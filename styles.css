@@ -1,33 +1,27 @@
 @import url("./ref/common.css");
 /* -----------------------------------------------------------------------------
- * [스타일 가이드 개요]
- * - 위 import는 root/ref/common.css의 타이포그래피·헤더 카드 컨벤션을 그대로 가져온다.
- * - 커스텀 오버레이/버튼 스타일은 full index.txt의 WebXR 데모 분위기를 참조하되,
- *   본 프로젝트의 AR 제어 요구사항에 맞춰 컴팩트하게 재배열하였다.
- * - 모든 사용자 정의 섹션에는 세부 한국어 주석을 추가하여 향후 디자이너/개발자 간
- *   커뮤니케이션 시 빠르게 근거를 확인할 수 있도록 한다.
+ * [스타일 가이드 요약]
+ * - 전체 UI는 최소한의 오버레이를 유지하여 3D 모델 시야를 최대한 확보하도록 구성.
+ * - 색상 변수는 공통 참조를 유지하되 투명 배경과 얇은 보더만 남겨 꾸밈 요소를 줄였다.
+ * - 버튼과 정보 HUD는 모두 pointer-events를 개별 요소에만 부여해 WebXR 제스처와 혼선을 방지.
  * --------------------------------------------------------------------------- */
 
 :root {
-  /* 하단 패널 글로우/테두리 등에 재사용되는 색상 정의 */
-  --accent-primary: #1c6bff;
-  --accent-secondary: #5ac8fa;
-  --surface-glass: rgba(18, 20, 31, 0.72);
-  --surface-panel: rgba(24, 26, 38, 0.88);
-  --text-strong: #f4f7ff;
-  --text-muted: rgba(244, 247, 255, 0.7);
-  --control-radius: 14px;
-  --overlay-gap: 1.25rem;
-  --transition-fast: 150ms ease-in-out;
-  /* TODO: 향후 라이트 테마 지원 시 위 변수 세트를 theme-light로 분리할 것. */
+  --surface-panel: rgba(12, 16, 26, 0.72);
+  --surface-pill: rgba(16, 20, 32, 0.85);
+  --text-strong: #f5f7ff;
+  --text-muted: rgba(240, 244, 255, 0.72);
+  --accent-primary: #3f74ff;
+  --accent-secondary: #63d4ff;
+  --control-radius: 10px;
+  --transition-fast: 140ms ease-in-out;
 }
 
-/* 전체 배경 및 타이포그래피 리셋: common.css의 폰트를 유지하면서 배경 무드를 조정한다. */
 body {
   margin: 0;
-  color: var(--text-strong);
-  background: radial-gradient(circle at 30% 20%, #101524, #020409 65%, #000000);
   min-height: 100vh;
+  background: radial-gradient(circle at 30% 15%, #111727 0%, #05070c 60%, #020205 100%);
+  color: var(--text-strong);
   display: flex;
   justify-content: center;
 }
@@ -37,60 +31,46 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  position: relative;
 }
 
 .app-header {
+  padding: 1.25rem clamp(1.2rem, 3vw, 2rem) 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.5rem 2rem 1rem;
-  background: linear-gradient(145deg, rgba(18, 20, 31, 0.9), rgba(18, 20, 31, 0.6));
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 0.6rem;
+  font-weight: 500;
 }
 
 .product-title {
   margin: 0;
-  font-size: clamp(1.8rem, 2.8vw, 2.6rem);
-  font-weight: 700;
+  font-size: clamp(1.6rem, 2.9vw, 2.4rem);
 }
 
 .product-subtitle {
-  margin: 0.35rem 0 0;
+  margin: 0;
+  font-size: clamp(0.95rem, 1.6vw, 1.1rem);
   color: var(--text-muted);
-  font-size: clamp(1rem, 1.4vw, 1.1rem);
 }
 
 .supporting-info {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
 }
 
 .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.badge-live {
-  background: rgba(35, 113, 255, 0.2);
+  border: 1px solid rgba(99, 212, 255, 0.5);
   color: var(--accent-secondary);
-  border: 1px solid rgba(90, 200, 250, 0.45);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
 }
 
 .viewer-stage {
   position: relative;
   flex: 1;
-  display: flex;
 }
 
 #catalog-viewer {
@@ -99,233 +79,90 @@ body {
   --poster-color: transparent;
 }
 
-#overlay-host {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
-  z-index: 2; /* 모델 뷰어 위에서 UI가 항상 표시되도록 스택 순서를 고정 */
-}
-
-/* 기본 AR 버튼은 사용자 정의 버튼으로 대체하므로 숨긴다. */
 model-viewer::part(ar-button) {
   display: none !important;
 }
 
-/* DOM Overlay 레이아웃 기본값: 모든 영역을 덮는 유리 패널 구조 */
-#ar-overlay {
+#overlay-host {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 1.5rem;
-  pointer-events: none; /* 기본은 XR 제스처 전달, 내부 상호작용 요소에서만 다시 활성화 */
-  box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(6, 8, 15, 0.55) 0%, rgba(6, 8, 15, 0) 35%);
-  transition: opacity var(--transition-fast);
+  pointer-events: none;
+  z-index: 2;
 }
 
-#ar-overlay .overlay-top,
-#ar-overlay .overlay-middle,
-#ar-overlay .overlay-bottom {
-  pointer-events: auto;
+#ar-overlay {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--overlay-gap);
-}
-
-#ar-overlay .overlay-top {
-  align-items: flex-start;
-}
-
-#ar-overlay .overlay-middle {
   flex-direction: column;
-  align-items: flex-start;
+  height: 100%;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  gap: clamp(0.6rem, 1.8vw, 1rem);
+  pointer-events: none;
+  box-sizing: border-box;
 }
 
-#ar-overlay .overlay-bottom {
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-panel);
-  border-radius: calc(var(--control-radius) + 6px);
-  padding: 1rem 1.5rem;
-  backdrop-filter: blur(18px);
-  box-shadow: 0 32px 55px rgba(3, 9, 23, 0.5);
+.overlay-top {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  pointer-events: auto;
 }
 
 .hud-block {
-  min-width: 220px;
-  padding: 0.9rem 1.1rem;
-  background: var(--surface-glass);
+  min-width: 160px;
+  padding: 0.55rem 0.75rem;
+  background: rgba(10, 14, 24, 0.78);
   border-radius: var(--control-radius);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(99, 212, 255, 0.18);
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .hud-title {
   display: block;
-  margin-bottom: 0.4rem;
-  font-size: 0.82rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(209, 219, 255, 0.74);
+  color: rgba(214, 226, 255, 0.7);
+  margin-bottom: 0.25rem;
 }
 
 .hud-body {
   margin: 0;
-  font-size: 0.95rem;
-  color: var(--text-strong);
+  font-size: 0.82rem;
 }
 
 .hud-caption {
   display: block;
-  margin-top: 0.35rem;
-  font-size: 0.75rem;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
 }
 
-.overlay-control {
-  display: inline-flex;
+.overlay-middle {
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.45rem;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--control-radius);
-  padding: 0.65rem 1rem;
-  color: var(--text-strong);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-  min-width: 110px;
-  text-align: center;
-}
-
-.overlay-control img {
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: calc(var(--control-radius) - 4px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-}
-
-.overlay-control:hover,
-.overlay-control:focus-visible {
-  border-color: rgba(90, 200, 250, 0.6);
-  transform: translateY(-2px);
-  box-shadow: 0 18px 38px rgba(25, 35, 68, 0.45);
-  outline: none;
-}
-
-.overlay-control.primary {
-  background: linear-gradient(135deg, var(--accent-primary), #3445ff);
-  border-color: rgba(52, 69, 255, 0.6);
-  box-shadow: 0 20px 40px rgba(28, 107, 255, 0.45);
-}
-
-.overlay-control span.label {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-}
-
-.slider-control {
-  align-items: stretch;
-  min-width: 200px;
-  text-transform: none;
-}
-
-.slider-control input[type="range"] {
-  -webkit-appearance: none;
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.15);
-  outline: none;
-  cursor: pointer;
-}
-
-.slider-control input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  background: var(--accent-secondary);
-  border-radius: 50%;
-  box-shadow: 0 6px 16px rgba(90, 200, 250, 0.45);
-}
-
-.slider-control input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  background: var(--accent-secondary);
-  border: none;
-  border-radius: 50%;
-  box-shadow: 0 6px 16px rgba(90, 200, 250, 0.45);
-}
-
-.hotspot-button {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.6rem;
-  background: rgba(18, 20, 31, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: calc(var(--control-radius) - 6px);
-  color: var(--text-strong);
-  font-size: 0.75rem;
-  pointer-events: auto;
-  cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
-}
-
-.hotspot-button:hover,
-.hotspot-button:focus-visible {
-  transform: translateY(-2px);
-  border-color: rgba(90, 200, 250, 0.6);
-  outline: none;
-}
-
-.hotspot-button img {
-  width: 60px;
-  height: 60px;
-  object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.4);
-}
-
-.hotspot-label {
-  letter-spacing: 0.06em;
+  gap: 0.5rem;
+  pointer-events: none;
 }
 
 .dimension-info {
   display: none;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.8rem 1rem;
-  background: rgba(8, 12, 26, 0.82);
+  gap: 0.35rem;
+  padding: 0.5rem 0.65rem;
+  background: rgba(8, 11, 20, 0.78);
+  border: 1px solid rgba(99, 212, 255, 0.2);
   border-radius: var(--control-radius);
-  border: 1px solid rgba(90, 200, 250, 0.2);
-  box-shadow: 0 18px 32px rgba(8, 12, 26, 0.45);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  pointer-events: auto;
+  width: fit-content;
 }
 
 .dimension-info.visible {
   display: flex;
-}
-
-.dimension-info .label {
-  text-transform: uppercase;
-  color: rgba(209, 219, 255, 0.74);
-  letter-spacing: 0.1em;
-  font-size: 0.75rem;
 }
 
 .dimension-info ul {
@@ -333,13 +170,13 @@ model-viewer::part(ar-button) {
   padding: 0;
   list-style: none;
   display: flex;
-  gap: 1.25rem;
+  gap: 0.9rem;
 }
 
 .dimension-info li {
   display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
+  gap: 0.3rem;
+  align-items: baseline;
 }
 
 .dimension-info strong {
@@ -347,111 +184,193 @@ model-viewer::part(ar-button) {
 }
 
 .dimension-info .caption {
-  color: rgba(209, 219, 255, 0.55);
   font-size: 0.7rem;
+  color: var(--text-muted);
 }
 
 .camera-toast {
   display: flex;
-  gap: 0.75rem;
   align-items: center;
-  padding: 0.85rem 1rem;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
   border-radius: var(--control-radius);
-  background: rgba(12, 16, 26, 0.9);
+  background: rgba(10, 14, 24, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 14px 32px rgba(6, 8, 15, 0.55);
-  max-width: 420px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  max-width: 320px;
+  pointer-events: auto;
 }
 
 .camera-toast img {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
 }
 
-.camera-toast p {
-  margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.5;
+.overlay-bottom {
+  align-self: center;
+  display: flex;
+  gap: 0.5rem;
+  background: var(--surface-panel);
+  border-radius: calc(var(--control-radius) + 6px);
+  padding: 0.55rem 0.8rem;
+  pointer-events: auto;
+  box-shadow: 0 12px 26px rgba(4, 6, 12, 0.45);
+}
+
+.overlay-control {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--control-radius);
+  color: var(--text-strong);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  min-width: 92px;
+}
+
+.overlay-control.primary {
+  background: linear-gradient(120deg, var(--accent-primary), #3752ff);
+  border-color: rgba(63, 116, 255, 0.5);
+  box-shadow: 0 16px 28px rgba(63, 116, 255, 0.35);
+}
+
+.overlay-control img {
+  width: 48px;
+  height: 48px;
+  border-radius: calc(var(--control-radius) - 4px);
+  object-fit: cover;
+}
+
+.overlay-control span.label {
   color: var(--text-muted);
+  font-size: 0.65rem;
+}
+
+.overlay-control:hover,
+.overlay-control:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(99, 212, 255, 0.7);
+  box-shadow: 0 14px 26px rgba(10, 86, 150, 0.45);
+  outline: none;
+}
+
+.slider-control {
+  min-width: 160px;
+  align-items: stretch;
+}
+
+.slider-control input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+}
+
+.slider-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--accent-secondary);
+  border-radius: 50%;
+  box-shadow: 0 6px 12px rgba(99, 212, 255, 0.4);
+}
+
+.slider-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--accent-secondary);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 6px 12px rgba(99, 212, 255, 0.4);
+}
+
+.hotspot-button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.55rem;
+  background: rgba(12, 16, 26, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: calc(var(--control-radius) - 2px);
+  color: var(--text-strong);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.hotspot-button img {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.hotspot-button:hover,
+.hotspot-button:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(99, 212, 255, 0.55);
+  outline: none;
 }
 
 .app-footer {
-  padding: 1rem 2rem 2rem;
-  font-size: 0.8rem;
-  color: rgba(209, 219, 255, 0.55);
+  padding: 0.8rem clamp(1.2rem, 3vw, 2rem) 1.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .app-footer code {
-  background: rgba(8, 12, 26, 0.9);
-  padding: 0.2rem 0.4rem;
+  padding: 0.15rem 0.35rem;
+  background: rgba(10, 14, 24, 0.85);
   border-radius: 6px;
-  border: 1px solid rgba(90, 200, 250, 0.2);
+  border: 1px solid rgba(99, 212, 255, 0.25);
   color: var(--accent-secondary);
-}
-
-/* AR 세션 상태에 따른 시각적 반응: data-ar-status를 활용하여 토스트/패널 상태를 제어한다. */
-#ar-overlay[data-ar-status="session-started"] {
-  background: linear-gradient(180deg, rgba(6, 8, 15, 0.35) 0%, rgba(6, 8, 15, 0.05) 55%);
 }
 
 #ar-overlay[data-ar-status="session-started"] .camera-toast {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 400ms ease;
+  transition: opacity 320ms ease;
 }
 
-#ar-overlay[data-ar-status="failed"] {
-  animation: overlay-shake 320ms ease-in-out;
-}
-
-@keyframes overlay-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  30% {
-    transform: translateX(-6px);
-  }
-  60% {
-    transform: translateX(6px);
-  }
-}
-
-/* 반응형: 모바일에서는 하단 패널을 슬라이더 형태로 스크롤 가능하게 처리한다. */
 @media (max-width: 768px) {
   #ar-overlay {
-    padding: 1rem;
-    gap: 1rem;
+    gap: 0.55rem;
   }
 
-  #ar-overlay .overlay-bottom {
-    flex-wrap: nowrap;
+  .overlay-top {
+    flex-wrap: wrap;
+  }
+
+  .overlay-bottom {
+    width: 100%;
     overflow-x: auto;
     justify-content: flex-start;
     scrollbar-width: thin;
   }
 
-  #ar-overlay .overlay-bottom::-webkit-scrollbar {
+  .overlay-bottom::-webkit-scrollbar {
     height: 6px;
   }
 
-  #ar-overlay .overlay-bottom::-webkit-scrollbar-thumb {
+  .overlay-bottom::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.18);
     border-radius: 999px;
   }
 
   .overlay-control {
-    min-width: 100px;
+    min-width: 90px;
   }
-
-  .camera-toast {
-    max-width: 100%;
-  }
-}
-
-/* 접근성: 포커스 시 테두리를 명확히 표시하여 키보드 조작을 지원한다. */
-.overlay-control:focus-visible,
-.hotspot-button:focus-visible {
-  box-shadow: 0 0 0 3px rgba(90, 200, 250, 0.45);
 }
