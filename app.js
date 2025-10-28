@@ -26,6 +26,7 @@ const dimWidthEl = document.querySelector("#dim-width");
 const dimHeightEl = document.querySelector("#dim-height");
 const dimDepthEl = document.querySelector("#dim-depth");
 const cameraToast = document.querySelector("#camera-toast");
+const overlayHost = document.querySelector("#overlay-host");
 
 // 애니메이션 상태/썸네일 매핑. 파일 경로는 root/img/ 를 기준으로 한다.
 const ANIMATION_STATE_MAP = {
@@ -79,6 +80,25 @@ arOverlay.addEventListener("beforexrselect", preventXRSelect);
 hotspotButton.addEventListener("beforexrselect", preventXRSelect);
 
 /**
+ * DOM Overlay 위치 제어
+ * -------------------------------------------------------------------------
+ * - 기본적으로 overlay-host 안에서 일반 UI로 노출된다.
+ * - AR 세션 요청 직전 model-viewer 내부로 이동시켜 slot="ar-dom-overlay"가 WebXR 루트로 작동하게 한다.
+ * - 세션 종료(또는 실패) 시 다시 overlay-host로 복귀시켜 Web 환경에서 계속 UI를 노출한다.
+ */
+function attachOverlayToModelViewer() {
+  if (arOverlay.parentElement !== modelViewer) {
+    modelViewer.appendChild(arOverlay);
+  }
+}
+
+function restoreOverlayToHost() {
+  if (overlayHost && arOverlay.parentElement !== overlayHost) {
+    overlayHost.appendChild(arOverlay);
+  }
+}
+
+/**
  * 모델 로딩 완료 처리
  * -------------------------------------------------------------------------
  * - 재질/애니메이션/치수 정보를 한 번에 확보하고, UI 상태를 초기화한다.
@@ -114,6 +134,7 @@ modelViewer.addEventListener("ar-status", (event) => {
   sessionStatusEl.textContent = status === "session-started" ? "세션 진행 중" : status;
 
   if (status === "session-started") {
+    attachOverlayToModelViewer();
     const overlayType = modelViewer?.xrSession?.domOverlayState?.type ?? "미지원";
     domOverlayStateEl.textContent = overlayType;
     console.info(`[DOMOverlay] 현재 DOM Overlay 유형: ${overlayType}`);
@@ -129,7 +150,9 @@ modelViewer.addEventListener("ar-status", (event) => {
     domOverlayStateEl.textContent = `시작 실패 (${reason || "원인 확인 필요"})`;
     enterARButton.innerHTML = `<img src="img/AR in.png" alt="" aria-hidden="true" /><span>재시도</span>`;
     enterARButton.setAttribute("aria-label", "AR 세션 재시도");
+    restoreOverlayToHost();
   } else {
+    restoreOverlayToHost();
     domOverlayStateEl.textContent = status === "not-presenting" ? "대기 중" : status;
     enterARButton.innerHTML = `<img src="img/AR in.png" alt="" aria-hidden="true" /><span>AR 시작</span>`;
     enterARButton.setAttribute("aria-label", "AR 세션 시작");
@@ -157,11 +180,13 @@ enterARButton.addEventListener("click", async () => {
   }
 
   try {
+    attachOverlayToModelViewer();
     await modelViewer.enterAR();
   } catch (error) {
     console.error("AR 세션 시작 실패:", error);
     sessionStatusEl.textContent = "세션 시작 실패";
     domOverlayStateEl.textContent = "에러 발생";
+    restoreOverlayToHost();
   }
 });
 
@@ -449,5 +474,6 @@ if (navigator.xr?.addEventListener) {
 updateEnterARAvailability();
 updateDimensionReadout();
 preloadVariantTextures();
+restoreOverlayToHost();
 
 // TODO: 필요 시 향후 GA 이벤트/로그 연동을 위한 추적 포인트 삽입 (현재는 콘솔 로그만 사용).

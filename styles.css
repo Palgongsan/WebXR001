@@ -99,6 +99,15 @@ body {
   --poster-color: transparent;
 }
 
+#overlay-host {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  z-index: 2; /* 모델 뷰어 위에서 UI가 항상 표시되도록 스택 순서를 고정 */
+}
+
 /* 기본 AR 버튼은 사용자 정의 버튼으로 대체하므로 숨긴다. */
 model-viewer::part(ar-button) {
   display: none !important;
