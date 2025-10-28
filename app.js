@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 세라젬 V11 WebXR 컨트롤
  * - 화면 고정형 핫스팟으로 애니메이션 토글/컬러 순환/회전을 제공한다.
  * - 마지막 상호작용 이후 3초가 지나면 핫스팟을 서서히 숨겼다가,
@@ -47,16 +47,6 @@ function preventXRSelect(event) {
   event.preventDefault();
 }
 
-screenHotspots.forEach((btn) => {
-  btn.addEventListener("beforexrselect", preventXRSelect);
-});
-
-[animationToggleButton, colorCycleButton, rotateButton]
-  .filter(Boolean)
-  .forEach((element) => {
-    element.addEventListener("beforexrselect", preventXRSelect);
-  });
-
 function showScreenHotspots() {
   clearTimeout(hotspotHideTimer);
   screenHotspots.forEach((btn) => btn.classList.remove("hotspot-hidden"));
@@ -74,17 +64,46 @@ function bumpHotspotVisibility() {
   scheduleHotspotHide();
 }
 
-modelViewer.addEventListener("pointerdown", () => showScreenHotspots());
+screenHotspots.forEach((btn) => {
+  btn.addEventListener("beforexrselect", preventXRSelect);
+  btn.addEventListener("click", bumpHotspotVisibility);
+});
+
+[animationToggleButton, colorCycleButton, rotateButton]
+  .filter(Boolean)
+  .forEach((element) => {
+    element.addEventListener("beforexrselect", preventXRSelect);
+  });
+
+const globalStartEvents = ["pointerdown", "touchstart", "mousedown"];
+const globalEndEvents = ["pointerup", "touchend", "mouseup", "pointercancel", "touchcancel"];
+
+globalStartEvents.forEach((evt) => {
+  window.addEventListener(
+    evt,
+    () => {
+      showScreenHotspots();
+    },
+    { passive: true }
+  );
+});
+
+globalEndEvents.forEach((evt) => {
+  window.addEventListener(
+    evt,
+    () => {
+      scheduleHotspotHide();
+    },
+    { passive: true }
+  );
+});
+
+modelViewer.addEventListener("pointerdown", showScreenHotspots);
 modelViewer.addEventListener("pointerup", () => scheduleHotspotHide());
 modelViewer.addEventListener("pointercancel", () => scheduleHotspotHide());
-modelViewer.addEventListener("interaction-start", () => showScreenHotspots());
+modelViewer.addEventListener("interaction-start", showScreenHotspots);
 modelViewer.addEventListener("interaction-end", () => scheduleHotspotHide());
-window.addEventListener("pointerup", () => scheduleHotspotHide());
-window.addEventListener("pointercancel", () => scheduleHotspotHide());
-
-screenHotspots.forEach((btn) => {
-  btn.addEventListener("click", () => bumpHotspotVisibility());
-});
+modelViewer.addEventListener("select", () => bumpHotspotVisibility());
 
 modelViewer.addEventListener("load", () => {
   captureBaseMaterial();
