@@ -53,7 +53,7 @@ model-viewer {
 }
 
 #ar-overlay {
-  width: 100%;
+  width: 30%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
