@@ -5,8 +5,7 @@
  */
 
 const modelViewer = document.querySelector("#catalog-viewer");
-const overlayHost = document.querySelector("#overlay-host");
-const arOverlay = document.querySelector("#ar-overlay");
+const overlayUI = document.querySelector("#overlay-ui");
 const animationToggleButton = document.querySelector("#animation-toggle-button");
 const animationThumb = document.querySelector("#animation-thumb");
 const hotspotButton = document.querySelector("#mode-hotspot");
@@ -43,18 +42,6 @@ const rotationState = {
   raf: null,
 };
 
-function attachOverlayToModelViewer() {
-  if (arOverlay && !modelViewer.contains(arOverlay)) {
-    modelViewer.appendChild(arOverlay);
-  }
-}
-
-function restoreOverlayToHost() {
-  if (overlayHost && arOverlay && arOverlay.parentElement !== overlayHost) {
-    overlayHost.appendChild(arOverlay);
-  }
-}
-
 function preventXRSelect(event) {
   event.preventDefault();
 }
@@ -66,7 +53,6 @@ function preventXRSelect(event) {
   });
 
 modelViewer.addEventListener("load", () => {
-  restoreOverlayToHost();
   captureBaseMaterial();
   detectAnimations();
   updateAnimationUI();
@@ -78,17 +64,10 @@ modelViewer.addEventListener("finished", () => {
 
 modelViewer.addEventListener("ar-status", (event) => {
   const status = event.detail.status;
-  if (arOverlay) {
-    arOverlay.dataset.arStatus = status;
+  if (overlayUI) {
+    overlayUI.dataset.arVisible = status === "session-started" ? "true" : "false";
   }
-
-  if (status === "session-started") {
-    attachOverlayToModelViewer();
-    const overlayType = modelViewer?.xrSession?.domOverlayState?.type ?? "unknown";
-    console.info(`[DOMOverlay] type: ${overlayType}`);
-  } else {
-    restoreOverlayToHost();
-  }
+  console.info(`[AR] status: ${status}`);
 });
 
 function toggleAnimation() {
@@ -303,6 +282,10 @@ async function getTextureForUri(uri) {
 // 초기 동작 준비
 restoreOverlayToHost();
 preloadVariantTextures();
+
+
+
+
 
 
 

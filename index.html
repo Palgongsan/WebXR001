@@ -83,50 +83,47 @@
             />
           </button>
 
+          <button
+            id="animation-toggle-button"
+            class="overlay-control screen-hotspot"
+            slot="hotspot-animation"
+            aria-label="애니메이션 전환"
+            data-visibility-attribute="visible"
+          >
+            <img
+              id="animation-thumb"
+              src="img/V11_thumbnail.webp"
+              alt="현재 애니메이션 썸네일"
+            />
+          </button>
+
+          <button
+            id="color-cycle-button"
+            class="overlay-control screen-hotspot"
+            slot="hotspot-color"
+            aria-label="컬러 텍스처 순환"
+            data-visibility-attribute="visible"
+          >
+            <img
+              src="img/V11_colorchange_thumbnail.webp"
+              alt="컬러 변경 썸네일"
+            />
+          </button>
+
+          <button
+            id="rotate-button"
+            class="overlay-control screen-hotspot"
+            slot="hotspot-rotate"
+            aria-label="모델 회전"
+            data-visibility-attribute="visible"
+          >
+            <img
+              src="img/V11_rotate_thumbnail.webp"
+              alt="회전 썸네일"
+            />
+          </button>
+
         </model-viewer>
-
-        <div id="overlay-host">
-          <div id="ar-overlay" slot="ar-dom-overlay" data-ar-status="not-presenting">
-            <div class="overlay-bottom" role="group" aria-label="세라젬 V11 AR 제어 패널">
-              <button
-                id="animation-toggle-button"
-                class="overlay-control"
-                type="button"
-                aria-label="애니메이션 전환"
-              >
-                <img
-                  id="animation-thumb"
-                  src="img/V11_thumbnail.webp"
-                  alt="현재 애니메이션 썸네일"
-                />
-              </button>
-
-              <button
-                id="color-cycle-button"
-                class="overlay-control"
-                type="button"
-                aria-label="컬러 텍스처 순환"
-              >
-                <img
-                  src="img/V11_colorchange_thumbnail.webp"
-                  alt="컬러 변경 썸네일"
-                />
-              </button>
-
-              <button
-                id="rotate-button"
-                class="overlay-control"
-                type="button"
-                aria-label="모델 회전"
-              >
-                <img
-                  src="img/V11_rotate_thumbnail.webp"
-                  alt="회전 썸네일"
-                />
-              </button>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
 
