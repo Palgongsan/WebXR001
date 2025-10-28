@@ -1,4 +1,4 @@
-@import url("./ref/common.css");
+﻿@import url("./ref/common.css");
 /* 최소 UI 유지: 화이트 배경 + 아이콘 중심 컨트롤만 배치 */
 
 body {
@@ -75,6 +75,8 @@ model-viewer {
   pointer-events: auto;
   --offset-x: -50%;
   transform: translateX(var(--offset-x)) translateY(0);
+  opacity: 1;
+  transition: transform 160ms ease, background 120ms ease, opacity 240ms ease;
   z-index: 40;
 }
 
@@ -101,9 +103,18 @@ model-viewer {
   inset: -8px;
   border-radius: 18px;
   border: 2px solid rgba(63, 116, 255, 0.45);
-  opacity: 0;
+  opacity: 0.6;
   animation: hotspot-pulse 2.4s ease-in-out infinite;
+  animation-play-state: running;
 }
+
+.screen-hotspot.hotspot-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(var(--offset-x)) translateY(16px);
+}
+
+.screen-hotspot.hotspot-hidden::before {\n  animation-play-state: paused;\n  opacity: 0;\n}
 
 .screen-hotspot:hover::before,
 .screen-hotspot:focus-visible::before {
@@ -161,3 +172,4 @@ model-viewer {
     opacity: 0.6;
   }
 }
+
