@@ -47,14 +47,14 @@ body {
 
 model-viewer {
   width: 100%;
-  height: 100%;
+  height: 80%;
   position: relative;
   background: #ffffff;
 }
 
 #ar-overlay {
-  width: 30%;
-  display: flex;
+  width: 40%;
+  display: grid;
   align-items: flex-end;
   justify-content: center;
   pointer-events: none;
@@ -66,13 +66,13 @@ model-viewer {
   pointer-events: auto;
   padding: 0.5rem;
   border-radius: 16px;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0);
 }
 
 .overlay-control {
   width: 64px;
   height: 64px;
-  display: inline-flex;
+  display: display-flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.08);
@@ -90,9 +90,9 @@ model-viewer {
 }
 
 .overlay-control img {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
   border-radius: 12px;
 }
 
@@ -110,8 +110,8 @@ model-viewer {
 }
 
 .hotspot-button img {
-  width: 56px;
-  height: 56px;
+  width: 30px;
+  height: 30px;
   object-fit: cover;
   border-radius: 12px;
 }
@@ -130,12 +130,12 @@ model-viewer {
   }
 
   .overlay-control {
-    width: 56px;
-    height: 56px;
+    width: 80px;
+    height: 80px;
   }
 
   .overlay-control img {
-    width: 44px;
-    height: 44px;
+    width: 100%;
+    height: 100%;
   }
 }
