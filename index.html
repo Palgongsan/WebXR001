@@ -1,570 +1,113 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>CERAGEM V11 WebXR Demo</title>
-    <meta name="description" content="CERAGEM V11 제품을 WebXR 기반 AR 환경에서 체험하며 모드, 재질, 회전을 제어할 수 있는 프로토타입">
-    <!-- 한국어 주석: CORS 이슈 방지를 위해 로컬에 저장한 model-viewer 모듈 사용 -->
-    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-<script nomodule src="https://unpkg.com/@google/model-viewer/dist/model-viewer-legacy.js"></script>
-    <style>
-      :root {
-        color-scheme: light;
-        --bg-base: #f7f8fa;
-        --surface: #ffffff;
-        --border: #d8dbe3;
-        --text-strong: #1d1f24;
-        --text-muted: #5b6578;
-        --accent: #2f54eb;
-        --accent-soft: rgba(47, 84, 235, 0.1);
-        --danger: #c92c2c;
-      }
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>WebXR Demo — modelviewer.dev UI mimic</title>
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <script nomodule src="https://unpkg.com/@google/model-viewer/dist/model-viewer-legacy.js"></script>
+  <style>
+    :root { color-scheme: light; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    main { display:grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+    .copy { padding: 32px; background:#f6f7fb; }
+    .copy h1 { margin:0 0 12px; font-size: 28px; }
+    .copy p { line-height:1.55; color:#444; }
+    model-viewer { width: 100%; height: 100vh; display:block; background:#fff; --poster-color:transparent; }
 
-      * {
-        box-sizing: border-box;
-      }
+    /* Example-like UI */
+    #ar-button {
+      position:absolute; left:50%; transform:translateX(-50%); bottom:16px;
+      background:#fff; color:#111; border:0; border-radius:20px; padding:10px 16px; font-weight:700; z-index:5;
+      box-shadow: 0 4px 20px rgba(0,0,0,.18);
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    #ar-button img { height:24px; }
+    #ar-prompt { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; pointer-events:none; z-index:4; }
+    #ar-prompt img { animation:pulse 2s infinite ease-in-out; }
+    @keyframes pulse {
+      from { transform:translate(-50%,-50%) scale(1); opacity:.9; }
+      50%  { transform:translate(-50%,-50%) scale(1.08); opacity:.6; }
+      to   { transform:translate(-50%,-50%) scale(1); opacity:.9; }
+    }
+    #ar-failure { position:absolute; left:50%; transform:translateX(-50%); top:16px; display:none; z-index:5; background:#ffefef; color:#b00020; padding:8px 12px; border-radius:10px; font-weight:600; box-shadow:0 2px 12px rgba(0,0,0,.15); }
 
-      body {
-        margin: 0;
-        font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
-        background: var(--bg-base);
-        color: var(--text-strong);
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        padding: clamp(16px, 4vw, 40px);
-      }
+    model-viewer[ar-status="session-started"] #ar-prompt { display:block; }
+    model-viewer[ar-status="failed"] #ar-failure { display:block; }
 
-      main {
-        width: min(1280px, 100%);
-        display: grid;
-        gap: clamp(16px, 3vw, 28px);
-      }
+    /* DOM overlay carousel */
+    #ar-overlay { position:fixed; inset:0; display:none; pointer-events:none; }
+    #ar-overlay * { pointer-events:auto; }
+    model-viewer[ar-status="session-started"] #ar-overlay,
+    model-viewer[ar-status="object-placed"]   #ar-overlay { display:block; }
+    .slider { position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:center; padding:12px; }
+    .slides { display:flex; gap:8px; background:rgba(0,0,0,.4); padding:8px; border-radius:12px; backdrop-filter: blur(6px); }
+    .slide { width:56px; height:56px; border-radius:8px; background-size:cover; background-position:center; border:2px solid rgba(255,255,255,.6); outline:none; }
+    .slide.selected { outline:3px solid #fff; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="copy">
+      <h1>WebXR Demo</h1>
+      <p>Customize a WebXR Augmented Reality session with HTML, CSS, and JS in Chrome 83+ on Android.</p>
+      <p>이 페이지는 <code>modelviewer.dev</code>의 AR 예제 UI를 모방한 테스트 파일입니다. DOM Overlay 검증을 위해 3D 모델은 데이터 URI로 인라인된 간단한 삼각형으로 대체했습니다.</p>
+      <pre style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;overflow:auto;">&lt;model-viewer ar ar-modes="webxr" ...&gt; ... &lt;/model-viewer&gt;</pre>
+    </section>
 
-      header {
-        padding: 4px 0;
-      }
+    <model-viewer id="mv"
+      src="data:model/gltf+json;base64,eyJhc3NldCI6IHsidmVyc2lvbiI6ICIyLjAifSwgInNjZW5lcyI6IFt7Im5vZGVzIjogWzBdfV0sICJzY2VuZSI6IDAsICJub2RlcyI6IFt7Im1lc2giOiAwfV0sICJtZXNoZXMiOiBbeyJwcmltaXRpdmVzIjogW3siYXR0cmlidXRlcyI6IHsiUE9TSVRJT04iOiAwfSwgImluZGljZXMiOiAxLCAibW9kZSI6IDR9XX1dLCAiYnVmZmVycyI6IFt7ImJ5dGVMZW5ndGgiOiA0MiwgInVyaSI6ICJkYXRhOmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbTtiYXNlNjQsQUFBQUFBQUFBQUFBQUFBQUFBQUFQd0FBQUFBQUFBQUFBQUFBQUFBQUFEOEFBQUFBQUFBQkFBSUEifV0sICJidWZmZXJWaWV3cyI6IFt7ImJ1ZmZlciI6IDAsICJieXRlT2Zmc2V0IjogMCwgImJ5dGVMZW5ndGgiOiAzNiwgInRhcmdldCI6IDM0OTYyfSwgeyJidWZmZXIiOiAwLCAiYnl0ZU9mZnNldCI6IDM2LCAiYnl0ZUxlbmd0aCI6IDYsICJ0YXJnZXQiOiAzNDk2M31dLCAiYWNjZXNzb3JzIjogW3siYnVmZmVyVmlldyI6IDAsICJieXRlT2Zmc2V0IjogMCwgImNvbXBvbmVudFR5cGUiOiA1MTI2LCAiY291bnQiOiAzLCAidHlwZSI6ICJWRUMzIiwgIm1pbiI6IFswLjAsIDAuMCwgMC4wXSwgIm1heCI6IFswLjUsIDAuNSwgMC4wXX0sIHsiYnVmZmVyVmlldyI6IDEsICJieXRlT2Zmc2V0IjogMCwgImNvbXBvbmVudFR5cGUiOiA1MTIzLCAiY291bnQiOiAzLCAidHlwZSI6ICJTQ0FMQVIifV19"
+      alt="Inline triangle"
+      camera-controls
+      touch-action="pan-y"
+      ar
+      ar-modes="webxr"
+      ar-placement="floor"
+      ar-scale="fixed">
 
-      header h1 {
-        margin: 0;
-        font-size: clamp(24px, 3vw, 32px);
-        font-weight: 600;
-        letter-spacing: -0.01em;
-      }
+      <button slot="ar-button" id="ar-button" type="button">
+        <img src="/img/AR in.png" alt="AR in"> View in your space
+      </button>
 
-      model-viewer {
-        width: 100%;
-        aspect-ratio: 4 / 3;
-        min-height: clamp(420px, 60vh, 720px);
-        border-radius: 24px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        --poster-color: #eef0f6;
-        --progress-bar-height: 4px;
-        --progress-bar-color: rgba(47, 84, 235, 0.7);
-        position: relative;
-        --ar-button-display: block;
-      }
-
-      #ar-start {
-        position: absolute;
-        bottom: clamp(12px, 2vw, 20px);
-        right: 20px;
-        padding: 0;
-        border: none;
-        background: transparent;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        pointer-events: auto;
-        cursor: pointer;
-        transform: none;
-      }
-
-      #ar-start[disabled] {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-
-      #ar-start img {
-        display: block;
-        width: clamp(50px, 13.5vw, 50px);
-        height: auto;
-      }
-
-      #ar-start:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 4px;
-      }
-
-      #ar-prompt img {
-        width: 70px;
-      }
-
-      #ar-unsupported {
-        position: absolute;
-        bottom: clamp(56px, 4vw, 88px);
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 5px 5px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.92);
-        border: 1px solid rgba(201, 44, 44, 0.35);
-        color: var(--danger);
-        font-size: 12px;
-        font-weight: 600;
-        text-align: center;
-        pointer-events: none;
-        display: none;
-      }
-
-      .controls-grid {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .control-button {
-        flex: 1 1 200px;
-        padding: 12px 16px;
-        font-size: 14px;
-        font-weight: 600;
-        background: var(--surface);
-        color: var(--text-strong);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        cursor: pointer;
-        text-align: left;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        min-height: 52px;
-      }
-
-      .control-button span[data-status] {
-        font-size: 12px;
-        color: var(--text-muted);
-        font-weight: 500;
-      }
-
-      .control-button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      #ar-overlay {
-        position: fixed;
-        inset: 0;
-        display: none;
-        flex-direction: column;
-        justify-content: flex-end;
-        padding: 16px;
-        padding-bottom: calc(16px + env(safe-area-inset-bottom));
-        gap: 12px;
-        pointer-events: auto;
-        z-index: 10;
-      }
-
-      #ar-overlay.dom-overlay-active {
-        display: flex;
-      }
-
-      #ar-overlay .control-button {
-        width: 100%;
-      }
-
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-      }
-
-      @media (max-width: 768px) {
-        body {
-          padding: 16px;
-        }
-
-        model-viewer {
-          aspect-ratio: 3 / 4;
-          border-radius: 20px;
-        }
-
-        .control-button {
-          flex: 1 1 100%;
-        }
-      }
-    
-/* Debug: ensure overlay/UI are above AR */
-#ar-overlay { z-index: 9999; }
-[slot="ar-button"], #ar-button, #ar-start { z-index: 10000; position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; }
-
-    </style>
-  </head>
-  <body>
-    <main>
-      <header>
-        <h1>CERAGEM V11 AR Experience</h1>
-      </header>
-
-      <model-viewer
-        id="cera-viewer"
-        src="./src/CERA_V11_low_Draco6_WebP_4K_001_self_optimize.glb"
-        poster="./img/V11_thumbnail.webp"
-        alt="세라젬 V11 안마의자 AR 체험 모델"
-        shadow-intensity="1"
-        camera-controls
-        touch-action="pan-y"
-        exposure="1"
-        environment-image="neutral"
-        ar
-        ar-modes="webxr"
-        ar-placement="floor"
-        ar-scale="fixed"
-        ar-dom-overlay="ar-overlay"
-      >
-        <button slot="ar-button" id="ar-start" type="button">
-          <img src="./img/AR in.png" alt="AR 세션 시작">
-        </button>
-        <div id="ar-unsupported">현재 브라우저는 WebXR AR을 지원하지 않습니다.</div>
-        <div slot="ar-prompt" id="ar-prompt">
-          <img src="https://modelviewer.dev/shared-assets/icons/hand.png" alt="AR 조작 안내">
-        </div>
-        <div id="ar-failure" slot="ar-status">AR 추적 문제 발생</div>
-
-        <div id="ar-overlay" slot="ar-dom-overlay">
-          <button class="control-button" type="button" data-control="mode">
-            애니메이션 모드 전환
-            <span data-status>현재: 체어 모드</span>
-          </button>
-          <button class="control-button" type="button" data-control="texture">
-            텍스처 컬러 순환
-            <span data-status>기본 → Beige → Olive</span>
-          </button>
-          <button class="control-button" type="button" data-control="rotate">
-            90° 회전
-            <span data-status>현재 각도 기준</span>
-          </button>
-        </div>
-      </model-viewer>
-
-      <div class="controls-grid" id="preview-controls">
-        <button class="control-button" type="button" data-control="mode">
-          애니메이션 모드 전환
-          <span data-status>현재: 체어 모드</span>
-        </button>
-        <button class="control-button" type="button" data-control="texture">
-          텍스처 컬러 순환
-          <span data-status>기본 → Beige → Olive</span>
-        </button>
-        <button class="control-button" type="button" data-control="rotate">
-          90° 회전
-          <span data-status>현재 각도 기준</span>
-        </button>
-        <button class="control-button" type="button" disabled>
-          치수 표시 (준비 중)
-          <span data-status>향후 업데이트 예정</span>
-        </button>
+      <div id="ar-prompt">
+        <img src="/img/AR in.png" alt="move phone">
       </div>
-    </main>
 
-    <script type="module">
-      // 한국어 주석: 전역 DOM 참조 및 공유 상태 값 선언
-      const modelViewer = document.querySelector("#cera-viewer");
-      const modeButtons = Array.from(document.querySelectorAll('button[data-control="mode"]'));
-      const textureButtons = Array.from(document.querySelectorAll('button[data-control="texture"]'));
-      const rotateButtons = Array.from(document.querySelectorAll('button[data-control="rotate"]'));
-      const arButton = document.querySelector("#ar-start");
-      const arUnsupportedMessage = document.getElementById("ar-unsupported");
-      const overlayRoot = document.getElementById("ar-overlay");
-overlayRoot?.addEventListener('beforexrselect', (ev)=>ev.preventDefault());
+      <button id="ar-failure" slot="ar-status">AR is not tracking!</button>
 
-      // Permissions-Policy probe: if embedded, ensure iframe allows 'xr-spatial-tracking' and 'camera'
-      try {
-        if (window.top !== window) {
-          console.warn('[WebXR] This page appears embedded in an iframe. Ensure the iframe has: allow="xr-spatial-tracking; camera; microphone; gyroscope; accelerometer"');
-        }
-      } catch(e) {}
+      <div id="ar-overlay" slot="ar-dom-overlay">
+        <div class="slider">
+          <div class="slides">
+            <button class="slide selected" onclick="switchBox(this)" style="background-image:url('/img/AR in.png');" title="Box A"></button>
+            <button class="slide" onclick="switchBox(this)" style="background-image:url('/img/AR in.png');" title="Box B"></button>
+            <button class="slide" onclick="switchBox(this)" style="background-image:url('/img/AR in.png');" title="Box C"></button>
+          </div>
+        </div>
+      </div>
+    </model-viewer>
+  </main>
 
-      // WebXR feature configuration so DOM overlay can be requested consistently.
-      const XR_REQUIRED_FEATURES = ["hit-test"];
-      const XR_DOM_OVERLAY_FEATURE = "dom-overlay";
-      const XR_BASE_OPTIONAL_FEATURES = ["light-estimation"];
-      const DOM_OVERLAY_ACTIVE_CLASS = "dom-overlay-active";
-      let domOverlaySupported = true;
-      const arUnsupportedDefaultText = arUnsupportedMessage?.textContent ?? "";
+  <script type="module">
+    const mv = document.getElementById('mv');
+    document.getElementById('ar-button')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try { await mv.enterAR(); } catch (err) { console.warn('enterAR error', err); }
+    });
 
-      if (!modelViewer) {
-        console.error("model-viewer 요소를 찾을 수 없습니다.");
-      }
-      if (!overlayRoot) {
-        console.warn("DOM overlay 루트를 찾을 수 없습니다. AR 세션에서 HTML overlay를 사용할 수 없습니다.");
-        domOverlaySupported = false;
-      }
-      ensureArButtonVisibility();
+    // Prevent XR gesture capture on overlay
+    document.querySelector('.slider')?.addEventListener('beforexrselect', (ev) => ev.preventDefault());
 
-      // 한국어 주석: 사용자 정의 가능한 카메라 줌 범위(단위: 미터). 필요 시 값만 수정하세요.
-      const MIN_CAMERA_DISTANCE = 1.4;
-      const MAX_CAMERA_DISTANCE = 4.5;
+    // In this mimic demo, switching boxes just toggles a selected class (same inline model)
+    window.switchBox = (btn) => {
+      document.querySelectorAll('.slide').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
 
-      // 한국어 주석: 애니메이션 토글(체어 ↔ 스트레치)
-      const animationMap = {
-        chair: { name: "CERA_V11_ChairMode(1)_Baked", label: "체어 모드" },
-        stretch: { name: "CERA_V11_Stretch(1)_Baked", label: "스트레치 모드" },
-      };
-      let currentMode = "chair";
-
-      // 한국어 주석: 텍스처 순환(기본 → Beige → Olive)
-      const textureSequence = [
-        { key: "original", label: "기본 텍스처" },
-        { key: "beige", label: "Beige 텍스처", src: "./texture/CERA_V11_low_D_Beige.png" },
-        { key: "olive", label: "Olive 텍스처", src: "./texture/CERA_V11_low_D_Olive.png" },
-      ];
-      let currentTextureIndex = 0;
-      const originalBaseTextures = new Map();
-      const loadedTextures = new Map();
-
-      // 한국어 주석: 회전 애니메이션 상태
-      let accumulatedRotation = 0;
-      let rotationAnimationFrame = null;
-
-      modelViewer?.addEventListener("load", () => {
-        storeOriginalTextures();
-        applyMode("chair", { immediate: true });
-        ensureArButtonVisibility();
-        applyCameraConstraints();
-      });
-
-      modelViewer?.addEventListener("ar-status", (event) => {
-        ensureArButtonVisibility();
-        updateOverlayPresentationState(event);
-      });
-
-      modeButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          const nextMode = currentMode === "chair" ? "stretch" : "chair";
-          applyMode(nextMode);
-        });
-      });
-
-      textureButtons.forEach((button) => {
-        button.addEventListener("click", async () => {
-          currentTextureIndex = (currentTextureIndex + 1) % textureSequence.length;
-          const { key, src, label } = textureSequence[currentTextureIndex];
-          await applyTextureVariant(key, src);
-          updateTextureStatus(key, label);
-        });
-      });
-
-      rotateButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          const startAngle = accumulatedRotation;
-          const targetAngle = startAngle + 90;
-          const duration = 300;
-          const startTime = performance.now();
-
-          cancelAnimationFrame(rotationAnimationFrame);
-
-          const animate = (timestamp) => {
-            const elapsed = timestamp - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = easeOutCubic(progress);
-            const currentAngle = startAngle + (targetAngle - startAngle) * eased;
-            modelViewer.orientation = `0deg 0deg ${currentAngle}deg`;
-
-            if (progress < 1) {
-              rotationAnimationFrame = requestAnimationFrame(animate);
-            } else {
-              accumulatedRotation = targetAngle % 360;
-            }
-          };
-
-          rotationAnimationFrame = requestAnimationFrame(animate);
-        });
-      });
-
-      function applyMode(modeKey, { immediate = false } = {}) {
-        if (!modelViewer || !animationMap[modeKey]) return;
-        currentMode = modeKey;
-        updateModeStatus();
-
-        const animationName = animationMap[modeKey].name;
-        modelViewer.animationName = animationName;
-
-        if (immediate) {
-          modelViewer.pause();
-          modelViewer.currentTime = 0;
-          return;
-        }
-
-        modelViewer.currentTime = 0;
-        modelViewer.play({ repetitions: 1 });
-        const handleFinished = () => {
-          modelViewer.pause();
-          modelViewer.removeEventListener("finished", handleFinished);
-        };
-        modelViewer.addEventListener("finished", handleFinished);
-      }
-
-      function updateModeStatus() {
-        const statusText = `현재: ${animationMap[currentMode].label}`;
-        modeButtons.forEach((button) => {
-          const status = button.querySelector("[data-status]");
-          if (status) status.textContent = statusText;
-        });
-      }
-
-      function updateTextureStatus(key, label) {
-        textureButtons.forEach((button) => {
-          const status = button.querySelector("[data-status]");
-          if (!status) return;
-          status.textContent = key === "original" ? "기본 → Beige → Olive" : `${label} 적용 중`;
-        });
-      }
-
-      function easeOutCubic(t) {
-        return 1 - Math.pow(1 - t, 3);
-      }
-
-      function storeOriginalTextures() {
-        if (!modelViewer?.model) return;
-        modelViewer.model.materials.forEach((material, index) => {
-          const baseColorTexture = material.pbrMetallicRoughness.baseColorTexture;
-          if (baseColorTexture && baseColorTexture.texture) {
-            originalBaseTextures.set(index, baseColorTexture.texture);
-          }
-        });
-      }
-
-      async function applyTextureVariant(key, src) {
-        if (!modelViewer?.model) return;
-
-        if (key === "original") {
-          modelViewer.model.materials.forEach((material, idx) => {
-            const originalTexture = originalBaseTextures.get(idx);
-            if (originalTexture) {
-              material.pbrMetallicRoughness.baseColorTexture.setTexture(originalTexture);
-            }
-          });
-          return;
-        }
-
-        const texture = await loadTextureOnce(src);
-        modelViewer.model.materials.forEach((material) => {
-          if (material.pbrMetallicRoughness.baseColorTexture) {
-            material.pbrMetallicRoughness.baseColorTexture.setTexture(texture);
-          }
-        });
-      }
-
-      async function loadTextureOnce(url) {
-        if (!loadedTextures.has(url)) {
-          loadedTextures.set(url, modelViewer.createTexture(url));
-        }
-        return loadedTextures.get(url);
-      }
-
-      function applyCameraConstraints() {
-        if (!modelViewer) return;
-        modelViewer.setAttribute("min-camera-orbit", `auto auto ${MIN_CAMERA_DISTANCE}m`);
-        modelViewer.setAttribute("max-camera-orbit", `auto auto ${MAX_CAMERA_DISTANCE}m`);
-      }
-
-      function ensureArButtonVisibility() {
-        if (!arButton) return;
-        arButton.style.display = "inline-flex";
-        if (!modelViewer?.canActivateAR || !domOverlaySupported) {
-          arButton.setAttribute("disabled", "disabled");
-          arButton.title = domOverlaySupported
-            ? "지원되지 않는 환경입니다."
-            : "이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.";
-          if (arUnsupportedMessage) {
-            arUnsupportedMessage.textContent = domOverlaySupported
-              ? arUnsupportedDefaultText
-              : "이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.";
-            arUnsupportedMessage.style.display = "block";
-          }
-        } else {
-          arButton.removeAttribute("disabled");
-          arButton.title = "AR 세션 시작";
-          if (arUnsupportedMessage) {
-            arUnsupportedMessage.textContent = arUnsupportedDefaultText;
-            arUnsupportedMessage.style.display = "none";
-          }
-        }
-      }
-
-      function buildArSessionOptions() {
-        const requiredFeatures = new Set(XR_REQUIRED_FEATURES);
-        const optionalFeatures = new Set(XR_BASE_OPTIONAL_FEATURES);
-        const sessionOptions = {
-          xrSessionMode: "immersive-ar",
-        };
-        if (overlayRoot) {
-          requiredFeatures.add(XR_DOM_OVERLAY_FEATURE);
-          sessionOptions.domOverlay = { root: overlayRoot };
-        }
-        sessionOptions.requiredFeatures = Array.from(requiredFeatures);
-        sessionOptions.optionalFeatures = Array.from(optionalFeatures);
-        return sessionOptions;
-      }
-
-      function updateOverlayPresentationState(event) {
-        if (!overlayRoot) return;
-        const detail = event?.detail;
-        const status = typeof detail === "string" ? detail : detail?.status;
-        if (status === "session-started") {
-          overlayRoot.classList.add(DOM_OVERLAY_ACTIVE_CLASS);
-          overlayRoot.removeAttribute("hidden");
-          const domOverlayState = modelViewer?.xrSession?.domOverlayState;
-          if (!domOverlayState) {
-            console.warn("DOM overlay was requested but is not available in this XR session.");
-          } else if (domOverlayState?.type) {
-            console.info(`DOM overlay type: ${domOverlayState.type}`);
-          }
-        } else if (status === "not-presenting" || status === "failed" || status === "session-ended") {
-          overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
-          overlayRoot.setAttribute("hidden", "hidden");
-        }
-      }
-
-      arButton?.addEventListener("click", async (event) => {
-        event.preventDefault();
-        if (!modelViewer) return;
-        if (!modelViewer.canActivateAR) {
-          console.warn("현재 환경은 WebXR AR을 지원하지 않습니다.");
-          return;
-        }
-        try {
-          const sessionOptions = buildArSessionOptions();
-          await modelViewer.enterAR({requiredFeatures:['hit-test','dom-overlay'], optionalFeatures:['light-estimation'], domOverlay:{root: overlayRoot}});
-        } catch (error) {
-          if (error?.name === "NotSupportedError" || /\bdom[- ]?overlay\b/i.test(error?.message ?? "")) {
-            console.error("이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.", error);
-            domOverlaySupported = false;
-            if (overlayRoot) {
-              overlayRoot.classList.remove(DOM_OVERLAY_ACTIVE_CLASS);
-              overlayRoot.setAttribute("hidden", "hidden");
-            }
-            if (arUnsupportedMessage) {
-              arUnsupportedMessage.textContent = "이 브라우저는 WebXR DOM Overlay를 지원하지 않습니다.";
-              arUnsupportedMessage.style.display = "block";
-            }
-            arButton?.setAttribute("disabled", "disabled");
-            ensureArButtonVisibility();
-          } else {
-            console.error("AR 세션 진입에 실패했습니다:", error);
-          }
-        }
-      });
-
-      // 한국어 주석: 치수 기능은 비활성화 상태로 유지
-    </script>
-  </body>
+    // Debug log for overlay state
+    mv.addEventListener('ar-status', ()=> {
+      const s = mv.xrSession;
+      console.log('[AR] status=', mv.getAttribute('ar-status'), 'domOverlayState=', s?.domOverlayState?.type ?? 'none');
+    });
+  </script>
+</body>
 </html>
