@@ -77,6 +77,8 @@ screenHotspots.forEach((btn) => {
 
 const globalStartEvents = ["pointerdown", "touchstart", "mousedown"];
 const globalEndEvents = ["pointerup", "touchend", "mouseup", "pointercancel", "touchcancel"];
+const xrStartEvents = ["selectstart"];
+const xrEndEvents = ["selectend"];
 
 globalStartEvents.forEach((evt) => {
   window.addEventListener(
@@ -98,6 +100,13 @@ globalEndEvents.forEach((evt) => {
   );
 });
 
+xrStartEvents.forEach((evt) => {
+  modelViewer.addEventListener(evt, showScreenHotspots);
+});
+
+xrEndEvents.forEach((evt) => {
+  modelViewer.addEventListener(evt, () => scheduleHotspotHide());
+});
 modelViewer.addEventListener("pointerdown", showScreenHotspots);
 modelViewer.addEventListener("pointerup", () => scheduleHotspotHide());
 modelViewer.addEventListener("pointercancel", () => scheduleHotspotHide());
@@ -212,7 +221,7 @@ function cancelRotationAnimation() {
 }
 
 function applyModelRotation(angleDeg) {
-  modelViewer.setAttribute("orientation", `0deg 0deg ${angleDeg.toFixed(2)}deg`);
+  modelViewer.setAttribute("orientation", `0deg ${angleDeg.toFixed(2)}deg 0deg`);
   modelViewer.requestRender?.();
 }
 
@@ -334,3 +343,6 @@ async function getTextureForUri(uri) {
 }
 
 preloadVariantTextures();
+
+
+
