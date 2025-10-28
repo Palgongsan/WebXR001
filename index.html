@@ -36,20 +36,7 @@
     -->
     <div id="app" class="app-shell">
       <header class="app-header">
-        <!--
-          제품 정보 헤더는 root/ref/full index.txt의 데모 무드(빛 번지는 카드 레이아웃)를 참고하였고,
-          AR 진입 전부터 사용자에게 명확한 제품 컨텍스트를 제공하기 위해 고정 배치한다.
-        -->
-        <div class="product-meta">
-          <h1 class="product-title">세라젬 V11</h1>
-          <p class="product-subtitle">
-            지능형 안마 의자를 실공간에서 배치해보고, 다양한 모드/컬러를 즉시 체험하세요.
-          </p>
-        </div>
-        <div class="supporting-info" role="status" aria-live="polite">
-          <span class="badge badge-live">LIVE AR PREVIEW</span>
-          <span class="support-text">HTTPS 환경 권장 · 카메라 권한 필요</span>
-        </div>
+        <h1>TEST</h1>
       </header>
 
       <main class="viewer-stage">
@@ -69,7 +56,6 @@
           camera-controls
           touch-action="pan-y"
           shadow-intensity="0.8"
-          exposure="1"
           interaction-prompt="none"
           environment-image="neutral"
           ar-status="not-presenting"
@@ -95,73 +81,24 @@
               src="img/V11_thumbnail.webp"
               alt="체어 모드 미리보기 썸네일"
             />
-            <span class="hotspot-label">모드 토글</span>
           </button>
 
         </model-viewer>
-        <!--
-          DOM Overlay 루트:
-          - slot="ar-dom-overlay" 속성은 유지하되, 기본적으로 viewer-stage 안에서 일반 DOM으로 표시한다.
-          - 실제 AR 세션 진입 시 app.js가 model-viewer 내부로 이동시켜 WebXR DOM Overlay로 재활용한다.
-        -->
+
         <div id="overlay-host">
           <div id="ar-overlay" slot="ar-dom-overlay" data-ar-status="not-presenting">
-            <div class="overlay-top">
-              <div class="hud-block" id="hud-dom-overlay">
-                <strong class="hud-title">DOM Overlay</strong>
-                <p class="hud-body">
-                  <span id="dom-overlay-state" aria-live="polite">대기 중</span>
-                  <span class="hud-caption">(세션 진입 시 유형 표시: screen/floating)</span>
-                </p>
-              </div>
-              <div class="hud-block" id="hud-ar-status">
-                <strong class="hud-title">AR 상태</strong>
-                <p class="hud-body" id="ar-session-status">대기 중</p>
-              </div>
-            </div>
-
-            <div class="overlay-middle">
-              <div id="dimension-info" class="dimension-info" aria-hidden="true">
-                <span class="label">실측 크기</span>
-                <ul>
-                  <li><strong>W</strong> <span id="dim-width">-</span></li>
-                  <li><strong>H</strong> <span id="dim-height">-</span></li>
-                  <li><strong>D</strong> <span id="dim-depth">-</span></li>
-                </ul>
-                <span class="caption">모델 이동/회전 중에만 표시</span>
-              </div>
-              <div id="camera-toast" class="camera-toast" role="status" aria-live="assertive">
-                <img src="img/AR in.png" alt="" aria-hidden="true" />
-                <p>
-                  카메라 권한을 허용하면 실공간 배치가 시작됩니다.<br />
-                  주변을 비추며 평평한 공간을 찾아주세요.
-                </p>
-              </div>
-            </div>
-
             <div class="overlay-bottom" role="group" aria-label="세라젬 V11 AR 제어 패널">
-              <button
-                id="enter-ar-button"
-                class="overlay-control primary"
-                type="button"
-                aria-label="AR 세션 시작"
-              >
-                <img src="img/AR in.png" alt="" aria-hidden="true" />
-                <span>AR 시작</span>
-              </button>
-
               <button
                 id="animation-toggle-button"
                 class="overlay-control"
                 type="button"
-                aria-label="애니메이션 모드 전환"
+                aria-label="애니메이션 전환"
               >
                 <img
                   id="animation-thumb"
                   src="img/V11_thumbnail.webp"
                   alt="현재 애니메이션 썸네일"
                 />
-                <span class="label">모드 전환</span>
               </button>
 
               <button
@@ -174,46 +111,23 @@
                   src="img/V11_colorchange_thumbnail.webp"
                   alt="컬러 변경 썸네일"
                 />
-                <span class="label">컬러 변경</span>
               </button>
 
               <button
                 id="rotate-button"
                 class="overlay-control"
                 type="button"
-                aria-label="모델을 90도 회전"
+                aria-label="모델 회전"
               >
                 <img
                   src="img/V11_rotate_thumbnail.webp"
                   alt="회전 썸네일"
                 />
-                <span class="label">90° 회전</span>
               </button>
-
-              <label class="overlay-control slider-control" for="exposure-slider">
-                <span class="label">노출 조정</span>
-                <input
-                  id="exposure-slider"
-                  type="range"
-                  min="0.2"
-                  max="1.8"
-                  step="0.05"
-                  value="1"
-                  aria-label="환경 노출 밝기 조절"
-                />
-              </label>
             </div>
           </div>
         </div>
       </main>
-
-      <footer class="app-footer">
-        <p>
-          © 세라젬 | WebXR 프로토타입 · iframe에 임베드할 경우
-          <code>allow="xr-spatial-tracking; camera; gyroscope; accelerometer"</code> 를
-          명시하세요.
-        </p>
-      </footer>
     </div>
 
     <!--
