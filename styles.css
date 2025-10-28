@@ -42,6 +42,7 @@ body {
   justify-content: center;
   padding: 1rem;
   box-sizing: border-box;
+  pointer-events: none;
   z-index: 10;
 }
 
@@ -56,6 +57,7 @@ model-viewer {
   width: 40%;
   display: flex;
   justify-content: center;
+  pointer-events: none;
 }
 
 .overlay-bottom {
@@ -64,6 +66,7 @@ model-viewer {
   padding: 0.5rem;
   border-radius: 16px;
   background: transparent;
+  pointer-events: auto;
 }
 
 .overlay-control {
@@ -121,7 +124,8 @@ model-viewer {
 
 @media (max-width: 768px) {
   .overlay-bottom {
-    width: 100%;
+    width: 200%;
+    height: 100%;
     justify-content: space-between;
   }
 
