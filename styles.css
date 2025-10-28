@@ -118,7 +118,10 @@ model-viewer {
   transform: translateX(var(--offset-x)) translateY(16px);
 }
 
-.screen-hotspot.hotspot-hidden::before {\n  animation-play-state: paused;\n  opacity: 0;\n}
+.screen-hotspot.hotspot-hidden::before {
+  animation-play-state: paused;
+  opacity: 0;
+}
 
 .screen-hotspot:hover::before,
 .screen-hotspot:focus-visible::before {
@@ -176,4 +179,3 @@ model-viewer {
     opacity: 0.6;
   }
 }
-
