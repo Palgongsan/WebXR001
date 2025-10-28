@@ -1,15 +1,15 @@
 /**
- * 세라젬 V11 WebXR 프로토타입 초기화 스크립트
+ * 세라젬 V11 WebXR DOM Overlay 제어 스크립트
  * ---------------------------------------------------------------------------
- * - root/ref/ar-barebones.html의 세션 흐름(지원 여부 체크 → dom-overlay 옵션 요청 →
- *   세션 종료 이벤트 처리)을 참고하여, 동일 내용을 <model-viewer> 기반 코드로 재구성한다.
- * - DOM Overlay는 slot 기반(root/ref/full index.txt 내 데모 구조)으로 유지하며,
- *   beforexrselect 이벤트를 적극적으로 사용해 XR 제스처와의 충돌을 방지한다.
- * - 필수 및 추가 기능(애니메이션 전환, 텍스처 교체, 치수 HUD, 회전 등)은 모두 한국어 주석을
- *   상세히 포함하여 실제 프로덕션 반영 시 TODO/수정 지점을 명확히 드러낸다.
+ * - root/ref/ar-barebones.html에서 소개한 WebXR 세션 흐름(지원 여부 확인 → dom-overlay
+ *   옵션 요청 → 세션 종료 처리)을 <model-viewer> 편의 API(enterAR)를 통해 래핑하였다.
+ * - DOM Overlay는 slot="ar-dom-overlay" 요소를 세션 시작 직전에 <model-viewer> 내부로
+ *   이동시키고, 종료 시 다시 overlay-host로 복귀시켜 일반 웹/AR 모두에서 UI를 유지한다.
+ * - 모든 사용자 상호작용 요소는 beforexrselect 이벤트를 사용하여 XR 제스처 충돌을 방지한다.
  */
 
 const modelViewer = document.querySelector("#catalog-viewer");
+const overlayHost = document.querySelector("#overlay-host");
 const arOverlay = document.querySelector("#ar-overlay");
 const domOverlayStateEl = document.querySelector("#dom-overlay-state");
 const sessionStatusEl = document.querySelector("#ar-session-status");
@@ -26,9 +26,10 @@ const dimWidthEl = document.querySelector("#dim-width");
 const dimHeightEl = document.querySelector("#dim-height");
 const dimDepthEl = document.querySelector("#dim-depth");
 const cameraToast = document.querySelector("#camera-toast");
-const overlayHost = document.querySelector("#overlay-host");
 
-// 애니메이션 상태/썸네일 매핑. 파일 경로는 root/img/ 를 기준으로 한다.
+const textureCache = new Map(); // model-viewer.createTexture() 결과 재사용
+
+// 애니메이션 상태에 따라 UI 썸네일/라벨을 매핑한다.
 const ANIMATION_STATE_MAP = {
   chair: {
     label: "체어 모드",
@@ -40,7 +41,7 @@ const ANIMATION_STATE_MAP = {
   },
 };
 
-// 텍스처 순환 정의: uri가 null이면 최초 GLB에 포함된 기본 텍스처를 의미한다.
+// 디퓨즈 텍스처 순환 정의 (null은 GLB 기본 텍스처 유지)
 const TEXTURE_SEQUENCE = [
   { id: "original", label: "기본 텍스처", uri: null },
   { id: "beige", label: "CERA V11 Beige", uri: "texture/CERA_V11_low_D_Beige.png" },
@@ -50,7 +51,7 @@ const TEXTURE_SEQUENCE = [
 let currentTextureIndex = 0;
 let baseMaterial = null;
 let baseColorTexture = null;
-let originalTextureUri = null;
+let originalBaseTexture = null;
 let chairAnimationName = null;
 let stretchAnimationName = null;
 let animationState = "chair";
@@ -67,10 +68,7 @@ let dimensionLoopId = null;
 let arSessionHasShownToast = false;
 
 /**
- * beforexrselect 이벤트 핸들러
- * -------------------------------------------------------------------------
- * - XR 세션 중 overlay 요소를 터치했을 때 입력이 XR 제스처(평면 찾기 등)로 전달되는
- *   것을 막기 위해 기본 동작을 취소한다.
+ * VR/AR 제스처와의 충돌을 방지하기 위해 overlay 상호작용에 XR 선택을 차단한다.
  */
 function preventXRSelect(event) {
   event.preventDefault();
@@ -80,14 +78,13 @@ arOverlay.addEventListener("beforexrselect", preventXRSelect);
 hotspotButton.addEventListener("beforexrselect", preventXRSelect);
 
 /**
- * DOM Overlay 위치 제어
- * -------------------------------------------------------------------------
- * - 기본적으로 overlay-host 안에서 일반 UI로 노출된다.
- * - AR 세션 요청 직전 model-viewer 내부로 이동시켜 slot="ar-dom-overlay"가 WebXR 루트로 작동하게 한다.
- * - 세션 종료(또는 실패) 시 다시 overlay-host로 복귀시켜 Web 환경에서 계속 UI를 노출한다.
+ * DOM Overlay 위치 제어:
+ * - 기본 상태: overlay-host 안에서 일반 DOM UI로 표시
+ * - AR 세션 시작 직전: <model-viewer> 내부로 이동시켜 slot="ar-dom-overlay" 활성화
+ * - 세션 종료/실패 시 overlay-host로 복귀
  */
 function attachOverlayToModelViewer() {
-  if (arOverlay.parentElement !== modelViewer) {
+  if (!modelViewer.contains(arOverlay)) {
     modelViewer.appendChild(arOverlay);
   }
 }
@@ -99,9 +96,7 @@ function restoreOverlayToHost() {
 }
 
 /**
- * 모델 로딩 완료 처리
- * -------------------------------------------------------------------------
- * - 재질/애니메이션/치수 정보를 한 번에 확보하고, UI 상태를 초기화한다.
+ * 모델 로딩 완료 시점에 재질/애니메이션/치수 정보를 확보한다.
  */
 modelViewer.addEventListener("load", () => {
   captureBaseMaterial();
@@ -109,22 +104,18 @@ modelViewer.addEventListener("load", () => {
   updateAnimationUI();
   updateEnterARAvailability();
   updateDimensionReadout();
+  preloadVariantTextures();
 });
 
 /**
- * 애니메이션이 끝날 때마다 호출하여 최종 포즈를 유지한다.
- * (loop를 끈 상태로 repetitions=1 실행 후 pause 하지 않으면 마지막 프레임에서 정지 상태가 유지된다.)
- * 그래도 안전을 위해 finished 이벤트에서 일시정지로 확실히 고정.
+ * 애니메이션 재생이 끝나면 마지막 포즈에서 멈추도록 pause 처리.
  */
 modelViewer.addEventListener("finished", () => {
   modelViewer.pause();
 });
 
 /**
- * AR 상태 변화 처리
- * -------------------------------------------------------------------------
- * - session-started / not-presenting / failed 상태별 UI, 텍스트, 버튼을 업데이트한다.
- * - domOverlayState.type(screen | floating | head-locked)을 HUD 및 콘솔에 출력한다.
+ * AR 상태 변경 시 HUD, 버튼, DOM Overlay 위치를 업데이트한다.
  */
 modelViewer.addEventListener("ar-status", (event) => {
   const status = event.detail.status;
@@ -135,9 +126,11 @@ modelViewer.addEventListener("ar-status", (event) => {
 
   if (status === "session-started") {
     attachOverlayToModelViewer();
-    const overlayType = modelViewer?.xrSession?.domOverlayState?.type ?? "미지원";
+
+    const overlayType = modelViewer.xrSession?.domOverlayState?.type ?? "미확인";
     domOverlayStateEl.textContent = overlayType;
-    console.info(`[DOMOverlay] 현재 DOM Overlay 유형: ${overlayType}`);
+    console.info(`[DOMOverlay] 세션에 연결된 유형: ${overlayType}`);
+
     enterARButton.innerHTML = `<img src="img/AR in.png" alt="" aria-hidden="true" /><span>AR 종료</span>`;
     enterARButton.setAttribute("aria-label", "AR 세션 종료");
 
@@ -152,29 +145,26 @@ modelViewer.addEventListener("ar-status", (event) => {
     enterARButton.setAttribute("aria-label", "AR 세션 재시도");
     restoreOverlayToHost();
   } else {
-    restoreOverlayToHost();
     domOverlayStateEl.textContent = status === "not-presenting" ? "대기 중" : status;
     enterARButton.innerHTML = `<img src="img/AR in.png" alt="" aria-hidden="true" /><span>AR 시작</span>`;
     enterARButton.setAttribute("aria-label", "AR 세션 시작");
+    restoreOverlayToHost();
   }
 });
 
 /**
- * AR 진입 버튼 클릭 처리
- * -------------------------------------------------------------------------
- * - canActivateAR을 통해 브라우저 지원 여부를 확인하고, 지원하지 않으면 안내 HUD를 갱신한다.
- * - 세션 중에는 XRSession.end()를 호출하여 종료한다.
+ * AR 버튼 클릭 시 세션 진입/종료를 전환한다.
  */
 enterARButton.addEventListener("click", async () => {
-  const currentStatus = arOverlay.dataset.arStatus;
+  const status = arOverlay.dataset.arStatus;
 
-  if (currentStatus === "session-started" && modelViewer.xrSession) {
+  if (status === "session-started" && modelViewer.xrSession) {
     await modelViewer.xrSession.end();
     return;
   }
 
   if (!modelViewer.canActivateAR) {
-    sessionStatusEl.textContent = "AR 미지원 환경 (HTTPS / 호환 브라우저 필요)";
+    sessionStatusEl.textContent = "AR 미지원 환경 (HTTPS + 호환 브라우저 필요)";
     domOverlayStateEl.textContent = "지원되지 않음";
     return;
   }
@@ -191,20 +181,16 @@ enterARButton.addEventListener("click", async () => {
 });
 
 /**
- * 애니메이션 토글: 버튼 & 핫스팟에서 동일 로직 재사용
- * -------------------------------------------------------------------------
- * - animationCrossfadeDuration으로 3초 블렌딩을 적용한다.
- * - play({ repetitions: 1 }) 호출로 자연스럽게 재생 후 정지 상태를 유지한다.
+ * 애니메이션 토글: ChairMode ↔ Stretch 모드를 3초 블렌딩 후 정지 상태로 유지.
  */
 function toggleAnimation() {
   if (!chairAnimationName || !stretchAnimationName) {
-    console.warn("애니메이션 이름을 찾지 못했습니다. GLB 내부 애니메이션 명칭 확인 필요.");
+    console.warn("애니메이션 이름을 찾지 못했습니다. GLB 애니메이션 명칭 확인 필요.");
     return;
   }
 
   const nextState = animationState === "chair" ? "stretch" : "chair";
-  const nextAnimation =
-    nextState === "chair" ? chairAnimationName : stretchAnimationName;
+  const nextAnimation = nextState === "chair" ? chairAnimationName : stretchAnimationName;
 
   modelViewer.animationCrossfadeDuration = 3000;
   modelViewer.animationLoop = false;
@@ -219,37 +205,35 @@ animationToggleButton.addEventListener("click", toggleAnimation);
 hotspotButton.addEventListener("click", toggleAnimation);
 
 /**
- * 텍스처 순환 처리
- * -------------------------------------------------------------------------
- * - 최초 로딩 시 캡처한 baseColorTexture.source.uri를 활용해 기본 텍스처로 복귀한다.
- * - 추가 텍스처는 setURI로 재지정하며, model-viewer 내부 로더 캐시를 활용한다.
+ * 디퓨즈 텍스처 순환 처리: createTexture() + setBaseColorTexture()
+ * - null 항목이면 originalBaseTexture로 복원한다.
  */
-colorCycleButton.addEventListener("click", () => {
-  if (!baseMaterial || !baseColorTexture) {
+colorCycleButton.addEventListener("click", async () => {
+  if (!baseMaterial) {
     console.warn("재질 정보를 찾을 수 없습니다. 모델 구조 확인 필요.");
     return;
   }
 
+  const previousIndex = currentTextureIndex;
   currentTextureIndex = (currentTextureIndex + 1) % TEXTURE_SEQUENCE.length;
   const textureInfo = TEXTURE_SEQUENCE[currentTextureIndex];
 
-  if (textureInfo.uri) {
-    baseColorTexture.texture.source.setURI(textureInfo.uri);
-  } else if (originalTextureUri) {
-    baseColorTexture.texture.source.setURI(originalTextureUri);
+  try {
+    await applyTextureInfo(textureInfo);
+  } catch (error) {
+    console.error("텍스처 적용 실패:", error);
+    currentTextureIndex = previousIndex;
+    return;
   }
 
   colorCycleButton.setAttribute(
     "aria-label",
-    `컬러 텍스처 순환 - 현재: ${textureInfo.label}`,
+    `디퓨즈 텍스처 순환 - 현재: ${textureInfo.label}`,
   );
 });
 
 /**
- * 모델 회전 처리
- * -------------------------------------------------------------------------
- * - model-rotation 속성(Yaw)을 JS로 갱신하며, requestAnimationFrame을 이용해 0.3초 이징 애니메이션을 구현한다.
- * - 이징 함수는 easeInOutCubic을 사용해 덜컹거림을 방지한다.
+ * 모델 회전: Y축 기준 90°씩 누적 회전, easeInOutCubic으로 0.3초 애니메이션.
  */
 rotateButton.addEventListener("click", () => {
   startRotationAnimation(rotationState.currentY, rotationState.currentY + 90);
@@ -268,10 +252,12 @@ function startRotationAnimation(fromDeg, toDeg) {
     if (!rotationState.startTime) {
       rotationState.startTime = timestamp;
     }
+
     const elapsed = timestamp - rotationState.startTime;
     const t = Math.min(elapsed / duration, 1);
     const eased = easeInOutCubic(t);
-    const current = rotationState.from + shortestAngleDelta(rotationState.from, rotationState.to) * eased;
+    const current =
+      rotationState.from + shortestAngleDelta(rotationState.from, rotationState.to) * eased;
 
     applyModelRotation(current);
 
@@ -314,7 +300,7 @@ function easeInOutCubic(t) {
 }
 
 /**
- * 노출 슬라이더 → <model-viewer>의 exposure 속성과 매핑
+ * 노출 슬라이더 → model-viewer의 exposure 속성에 연결.
  */
 exposureSlider.addEventListener("input", (event) => {
   const value = Number.parseFloat(event.target.value);
@@ -322,8 +308,7 @@ exposureSlider.addEventListener("input", (event) => {
 });
 
 /**
- * 사용자 상호작용 시 치수 HUD를 표시하고, 조작 종료 후 숨긴다.
- * - getDimensions()는 모델의 바운딩 박스를 미터 단위로 반환하므로, 보기 좋은 cm 단위로 변환한다.
+ * 사용자 상호작용 시 치수 HUD 표시, 종료 시 숨김.
  */
 modelViewer.addEventListener("interaction-start", () => {
   dimensionPanel.classList.add("visible");
@@ -337,9 +322,6 @@ modelViewer.addEventListener("interaction-end", () => {
   dimensionPanel.setAttribute("aria-hidden", "true");
 });
 
-/**
- * 치수 루프: 사용자가 드래그/핀치하는 동안 주기적으로 값을 갱신한다.
- */
 function startDimensionLoop() {
   stopDimensionLoop();
   const loop = () => {
@@ -359,8 +341,7 @@ function stopDimensionLoop() {
 function updateDimensionReadout() {
   const dimensions = modelViewer.getDimensions?.();
   if (!dimensions) {
-    dimWidthEl.textContent = dimHeightEl.textContent = dimDepthEl.textContent =
-      "데이터 없음";
+    dimWidthEl.textContent = dimHeightEl.textContent = dimDepthEl.textContent = "데이터 없음";
     return;
   }
 
@@ -374,7 +355,7 @@ function formatMetersToCentimeters(value) {
 }
 
 /**
- * 모델 재질 정보를 확보하고, 기본 베이스 컬러 텍스처 URI를 저장한다.
+ * 모델의 기본 재질/텍스처 정보를 확보한다.
  */
 function captureBaseMaterial() {
   const materials = modelViewer.model?.materials;
@@ -385,21 +366,16 @@ function captureBaseMaterial() {
 
   baseMaterial = materials[0];
   baseColorTexture = baseMaterial.pbrMetallicRoughness?.baseColorTexture ?? null;
-  if (baseColorTexture?.texture?.source) {
-    originalTextureUri = baseColorTexture.texture.source.uri;
-  }
+  originalBaseTexture = baseColorTexture?.texture ?? null;
 }
 
 /**
- * 애니메이션 이름 탐색
- * -------------------------------------------------------------------------
- * - GLB 내부 애니메이션 이름이 스펙 문서(CERA_V11_ChairMode / Stretch)와 불일치할 가능성이 있으므로,
- *   toLowerCase() 후 부분 문자열을 찾아 안전하게 매핑한다.
+ * GLB 내부 애니메이션 이름을 탐색하여 Chair/Stretch 모드를 매핑한다.
  */
 function detectAnimations() {
   const available = modelViewer.availableAnimations || [];
   if (available.length === 0) {
-    console.warn("사용 가능한 애니메이션이 없습니다. GLB에 애니메이션이 포함되어 있는지 확인하세요.");
+    console.warn("사용 가능한 애니메이션이 없습니다. GLB 애니메이션 포함 여부를 확인하세요.");
     return;
   }
 
@@ -418,7 +394,7 @@ function detectAnimations() {
 }
 
 /**
- * 애니메이션 UI(썸네일 / 레이블 / aria) 갱신
+ * 애니메이션 UI(썸네일/라벨/aria)를 현재 상태에 맞춰 갱신.
  */
 function updateAnimationUI() {
   const config = ANIMATION_STATE_MAP[animationState];
@@ -439,18 +415,20 @@ function updateAnimationUI() {
 }
 
 /**
- * 추가 텍스처 사전 로드: 빠른 전환을 위해 Image 객체를 생성해 브라우저 캐시에 적재한다.
+ * 텍스처 프리로드: createTexture()를 미리 호출하여 캐싱.
  */
 function preloadVariantTextures() {
   TEXTURE_SEQUENCE.forEach((texture) => {
     if (!texture.uri) return;
-    const img = new Image();
-    img.src = texture.uri;
+
+    getTextureForUri(texture.uri).catch((error) => {
+      console.warn("텍스처 프리로드 실패:", error);
+    });
   });
 }
 
 /**
- * AR 지원 여부가 변동될 수 있으므로, 버튼 활성화 상태를 즉시 갱신한다.
+ * AR 지원 여부에 따라 진입 버튼 상태를 갱신.
  */
 function updateEnterARAvailability() {
   if (!enterARButton) return;
@@ -461,19 +439,61 @@ function updateEnterARAvailability() {
   enterARButton.disabled = !modelViewer.canActivateAR;
 }
 
-/**
- * load 외에도 WebXR 디바이스 변경 시 canActivateAR이 바뀔 수 있으므로 감지한다.
- */
 if (navigator.xr?.addEventListener) {
   navigator.xr.addEventListener("devicechange", updateEnterARAvailability);
 }
 
 /**
- * 페이지 진입 시점에 한 번 초기 상태를 세팅해준다.
+ * 텍스처 적용 로직: null이면 기본 텍스처 복원, 아니면 캐시된 텍스처 적용.
  */
+async function applyTextureInfo(textureInfo) {
+  if (!baseMaterial) {
+    throw new Error("재질 정보가 존재하지 않습니다.");
+  }
+
+  if (!textureInfo || !textureInfo.uri) {
+    if (originalBaseTexture) {
+      baseMaterial.pbrMetallicRoughness.setBaseColorTexture(originalBaseTexture);
+      baseColorTexture = baseMaterial.pbrMetallicRoughness.baseColorTexture ?? baseColorTexture;
+    } else {
+      console.warn("복원할 기본 텍스처가 없습니다.");
+    }
+    return;
+  }
+
+  const gltfTexture = await getTextureForUri(textureInfo.uri);
+  if (!gltfTexture) {
+    throw new Error(`텍스처 로드 실패: ${textureInfo.uri}`);
+  }
+
+  baseMaterial.pbrMetallicRoughness.setBaseColorTexture(gltfTexture);
+  baseColorTexture = baseMaterial.pbrMetallicRoughness.baseColorTexture ?? baseColorTexture;
+}
+
+async function getTextureForUri(uri) {
+  if (!uri) {
+    return null;
+  }
+
+  if (textureCache.has(uri)) {
+    return textureCache.get(uri);
+  }
+
+  let texture = null;
+  try {
+    texture = await modelViewer.createTexture(uri);
+  } catch (error) {
+    console.error("createTexture 실패:", error);
+    throw error;
+  }
+
+  textureCache.set(uri, texture);
+  return texture;
+}
+
+// 초기 상태 정리
+restoreOverlayToHost();
 updateEnterARAvailability();
 updateDimensionReadout();
-preloadVariantTextures();
-restoreOverlayToHost();
 
-// TODO: 필요 시 향후 GA 이벤트/로그 연동을 위한 추적 포인트 삽입 (현재는 콘솔 로그만 사용).
+// TODO: 향후 분석/로그 연동 시 enterAR / texture 교체 등 주요 이벤트 지점을 활용할 것.
