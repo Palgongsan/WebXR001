@@ -1,7 +1,8 @@
 /**
- * 세라젬 V11 WebXR 컨트롤 스크립트
- * - 애니메이션 토글, 컬러 순환, Z축 90° 회전을 화면 고정 핫스팟으로 제공한다.
- * - 사용자가 3초 이상 상호작용하지 않으면 핫스팟이 서서히 숨겨지고, 다시 터치하거나 버튼을 누르면 표시된다.
+ * 세라젬 V11 WebXR 컨트롤
+ * - 화면 고정형 핫스팟으로 애니메이션 토글/컬러 순환/회전을 제공한다.
+ * - 마지막 상호작용 이후 3초가 지나면 핫스팟을 서서히 숨겼다가,
+ *   모델을 다시 터치하거나 버튼을 누르면 즉시 표시한다.
  */
 
 const modelViewer = document.querySelector("#catalog-viewer");
@@ -48,7 +49,6 @@ function preventXRSelect(event) {
 
 screenHotspots.forEach((btn) => {
   btn.addEventListener("beforexrselect", preventXRSelect);
-  btn.addEventListener("click", bumpHotspotVisibility);
 });
 
 [animationToggleButton, colorCycleButton, rotateButton]
@@ -74,20 +74,24 @@ function bumpHotspotVisibility() {
   scheduleHotspotHide();
 }
 
-modelViewer.addEventListener("pointerdown", showScreenHotspots);
-modelViewer.addEventListener("pointerup", scheduleHotspotHide);
-modelViewer.addEventListener("pointercancel", scheduleHotspotHide);
-modelViewer.addEventListener("interaction-start", showScreenHotspots);
-modelViewer.addEventListener("interaction-end", scheduleHotspotHide);
+modelViewer.addEventListener("pointerdown", () => showScreenHotspots());
+modelViewer.addEventListener("pointerup", () => scheduleHotspotHide());
+modelViewer.addEventListener("pointercancel", () => scheduleHotspotHide());
+modelViewer.addEventListener("interaction-start", () => showScreenHotspots());
+modelViewer.addEventListener("interaction-end", () => scheduleHotspotHide());
+window.addEventListener("pointerup", () => scheduleHotspotHide());
+window.addEventListener("pointercancel", () => scheduleHotspotHide());
 
-window.addEventListener("pointerup", scheduleHotspotHide);
-window.addEventListener("pointercancel", scheduleHotspotHide);
+screenHotspots.forEach((btn) => {
+  btn.addEventListener("click", () => bumpHotspotVisibility());
+});
 
 modelViewer.addEventListener("load", () => {
   captureBaseMaterial();
   detectAnimations();
   updateAnimationUI();
-  bumpHotspotVisibility();
+  showScreenHotspots();
+  scheduleHotspotHide();
 });
 
 modelViewer.addEventListener("finished", () => {
