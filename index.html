@@ -3,27 +3,53 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>WebXR Demo — modelviewer.dev UI mimic (Inline Cube)</title>
+  <title>WebXR DOM Overlay — Debug (Green Box)</title>
+
+  <!-- 공식 CDN -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <script nomodule src="https://unpkg.com/@google/model-viewer/dist/model-viewer-legacy.js"></script>
+
   <style>
     :root { color-scheme: light; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#f5f6f8; }
-    main { display:grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
-    @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
-    .copy { padding: 32px; }
-    .copy h1 { margin:0 0 12px; font-size: 28px; }
-    .copy p { line-height:1.55; color:#444; }
-    model-viewer { width: 100%; height: 100vh; display:block; background:#fff; --poster-color: #ffffff; border-left:1px solid #e5e7eb; position: relative; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:#f5f6f8; }
 
-    /* example-like UI */
+    .wrap { display:grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+    @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+
+    .copy { padding: 24px 28px; }
+    .copy h1 { margin: 0 0 8px; font-size: 28px; }
+    .copy p { color:#444; line-height: 1.6; }
+
+    model-viewer {
+      width: 100%; height: 100vh; display: block; background: #fff; --poster-color: #ffffff;
+      border-left: 1px solid #e5e7eb; position: relative;
+    }
+
+    /* ▼ 항상 보이는 디버그용 UI (AR 여부와 무관) */
+    #ui-always {
+      position: fixed; right: 16px; bottom: 16px; z-index: 10010;
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+    }
+    .btn {
+      appearance: none; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 700;
+      background:#111; color:#fff; box-shadow: 0 4px 16px rgba(0,0,0,.18); cursor: pointer;
+    }
+    .btn.secondary { background:#fff; color:#111; }
+    .toast {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: 80px; z-index: 10011;
+      background:#111; color:#fff; padding: 10px 14px; border-radius: 10px; font-weight:600;
+      display:none;
+    }
+
+    /* ▼ 모델뷰어 예제와 동일한 슬롯 UI 구조 */
     #ar-button {
       position:absolute; left:50%; transform:translateX(-50%); bottom:16px;
       background:#fff; color:#111; border:0; border-radius:20px; padding:10px 16px; font-weight:700; z-index:5;
-      box-shadow: 0 4px 20px rgba(0,0,0,.18);
-      display:inline-flex; align-items:center; gap:8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.18); display:inline-flex; align-items:center; gap:8px;
     }
     #ar-button img { height:24px; }
+
     #ar-prompt { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; pointer-events:none; z-index:4; }
     #ar-prompt img { height:48px; animation:pulse 2s infinite ease-in-out; }
     @keyframes pulse {
@@ -31,39 +57,60 @@
       50%  { transform:translate(-50%,-50%) scale(1.08); opacity:.6; }
       to   { transform:translate(-50%,-50%) scale(1); opacity:.9; }
     }
-    #ar-failure { position:absolute; left:50%; transform:translateX(-50%); top:16px; display:none; z-index:5; background:#ffefef; color:#b00020; padding:8px 12px; border-radius:10px; font-weight:600; box-shadow:0 2px 12px rgba(0,0,0,.15); }
+
+    #ar-failure {
+      position:absolute; left:50%; transform:translateX(-50%); top:16px; display:none; z-index:5;
+      background:#ffefef; color:#b00020; padding:8px 12px; border-radius:10px; font-weight:600; box-shadow:0 2px 12px rgba(0,0,0,.15);
+    }
 
     model-viewer[ar-status="session-started"] #ar-prompt { display:block; }
     model-viewer[ar-status="failed"] #ar-failure { display:block; }
 
-    /* DOM overlay carousel */
-    #ar-overlay { position:fixed; inset:0; display:none; pointer-events:none; }
-    #ar-overlay * { pointer-events:auto; }
+    /* ▼ DOM Overlay (AR 세션에서 보임) + 항상 보이는 미러 패널 */
+    #ar-overlay { position: fixed; inset: 0; display: none; pointer-events: none; }
+    #ar-overlay * { pointer-events: auto; }
     model-viewer[ar-status="session-started"] #ar-overlay,
-    model-viewer[ar-status="object-placed"]   #ar-overlay { display:block; }
-    .slider { position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:center; padding:12px; }
-    .slides { display:flex; gap:8px; background:rgba(0,0,0,.4); padding:8px; border-radius:12px; backdrop-filter: blur(6px); }
-    .slide { width:56px; height:56px; border-radius:8px; background-size:cover; background-position:center; border:2px solid rgba(255,255,255,.6); outline:none; }
+    model-viewer[ar-status="object-placed"]   #ar-overlay { display: block; }
+
+    .slider {
+      position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:center; padding:12px;
+    }
+    .slides {
+      display:flex; gap:8px; background:rgba(0,0,0,.4); padding:8px; border-radius:12px; backdrop-filter: blur(6px);
+    }
+    .slide {
+      width:56px; height:56px; border-radius:8px; background-size:cover; background-position:center;
+      border:2px solid rgba(255,255,255,.6); outline: none;
+    }
     .slide.selected { outline:3px solid #fff; }
 
-    /* helper to visualize viewer area */
-    .mv-frame::after { content:""; position:absolute; inset:0; pointer-events:none; box-shadow: inset 0 0 0 2px rgba(0,0,0,.05); }
+    /* ▼ 항상 보이는 미러 패널 (DOM Overlay와 동일한 버튼을 3D모드에서도 보기 위함) */
+    #overlay-mirror {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: 90px; z-index: 10005;
+      display: block;
+    }
+    #overlay-mirror .slides { background: rgba(0,0,0,.25); }
+
+    /* ▼ HUD */
+    #hud {
+      position: fixed; left: 12px; top: 12px; z-index: 10012;
+      background: rgba(0,0,0,.6); color:#fff; border-radius: 10px; padding: 8px 10px; font: 12px/1.35 system-ui;
+    }
+    #hud b { color:#A5D6FF; }
   </style>
 </head>
 <body>
-  <main>
+  <div class="wrap">
     <section class="copy">
-      <h1>WebXR Demo</h1>
-      <p>Customize a WebXR Augmented Reality session with HTML, CSS, and JS in Chrome 83+ on Android.</p>
-      <p>이 페이지는 modelviewer.dev의 AR 예제 UI를 모방한 테스트 파일입니다. 외부 리소스 없이 <strong>인라인 glTF(빨간 큐브)</strong>를 사용합니다.</p>
-      <pre style="font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;overflow:auto;">&lt;model-viewer ar ar-modes="webxr" ...&gt; ... &lt;/model-viewer&gt;</pre>
+      <h1>WebXR DOM Overlay — Debug</h1>
+      <p>항상 보이는 버튼과 패널을 포함한 테스트 파일입니다. AR 미지원 환경에서도 UI가 보이며, AR 세션에서는 DOM Overlay(<code>slot="ar-dom-overlay"</code>)가 활성화됩니다.</p>
     </section>
 
-    <model-viewer id="mv" class="mv-frame"
-      src="data:model/gltf+json;base64,eyJhc3NldCI6IHsidmVyc2lvbiI6ICIyLjAifSwgInNjZW5lcyI6IFt7Im5vZGVzIjogWzBdfV0sICJzY2VuZSI6IDAsICJub2RlcyI6IFt7Im1lc2giOiAwfV0sICJtZXNoZXMiOiBbeyJwcmltaXRpdmVzIjogW3siYXR0cmlidXRlcyI6IHsiUE9TSVRJT04iOiAwfSwgImluZGljZXMiOiAxLCAibWF0ZXJpYWwiOiAwLCAibW9kZSI6IDR9XX1dLCAibWF0ZXJpYWxzIjogW3sicGJyTWV0YWxsaWNSb3VnaG5lc3MiOiB7ImJhc2VDb2xvckZhY3RvciI6IFswLjksIDAuMiwgMC4yLCAxLjBdLCAibWV0YWxsaWNGYWN0b3IiOiAwLjAsICJyb3VnaG5lc3NGYWN0b3IiOiAxLjB9fV0sICJidWZmZXJzIjogW3siYnl0ZUxlbmd0aCI6IDE2OCwgInVyaSI6ICJkYXRhOmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbTtiYXNlNjQsQUFBQUFBQUFBQUFBQUFBQUFBQ0FQd0FBQUFBQUFBQUFBQUNBUHdBQWdEOEFBQUFBQUFBQUFBQUFnRDhBQUFBQUFBQUFBQUFBQUFBQUFJQS9BQUNBUHdBQUFBQUFBSUEvQUFDQVB3QUFnRDhBQUlBL0FBQUFBQUFBZ0Q4QUFJQS9BQUFCQUFJQUFBQUNBQU1BQkFBR0FBVUFCQUFIQUFZQUFBQUVBQVVBQUFBRkFBRUFBd0FDQUFZQUF3QUdBQWNBQVFBRkFBWUFBUUFHQUFJQUFBQURBQWNBQUFBSEFBUUEifV0sICJidWZmZXJWaWV3cyI6IFt7ImJ1ZmZlciI6IDAsICJieXRlT2Zmc2V0IjogMCwgImJ5dGVMZW5ndGgiOiA5NiwgInRhcmdldCI6IDM0OTYyfSwgeyJidWZmZXIiOiAwLCAiYnl0ZU9mZnNldCI6IDk2LCAiYnl0ZUxlbmd0aCI6IDcyLCAidGFyZ2V0IjogMzQ5NjN9XSwgImFjY2Vzc29ycyI6IFt7ImJ1ZmZlclZpZXciOiAwLCAiYnl0ZU9mZnNldCI6IDAsICJjb21wb25lbnRUeXBlIjogNTEyNiwgImNvdW50IjogOCwgInR5cGUiOiAiVkVDMyIsICJtaW4iOiBbMC4wLCAwLjAsIDAuMF0sICJtYXgiOiBbMS4wLCAxLjAsIDEuMF19LCB7ImJ1ZmZlclZpZXciOiAxLCAiYnl0ZU9mZnNldCI6IDAsICJjb21wb25lbnRUeXBlIjogNTEyMywgImNvdW50IjogMzYsICJ0eXBlIjogIlNDQUxBUiJ9XX0="
+    <!-- ▼ src는 JS에서 생성한 '초록색 박스(glTF, 중앙 정렬)' 데이터 URI로 주입 -->
+    <model-viewer id="mv"
       exposure="1.0"
       environment-image="neutral"
-      alt="Inline cube"
+      alt="Green box"
       camera-controls
       touch-action="pan-y"
       ar
@@ -71,6 +118,7 @@
       ar-placement="floor"
       ar-scale="fixed">
 
+      <!-- ▼ 예제와 동일한 슬롯 UI -->
       <button slot="ar-button" id="ar-button" type="button">
         <img src="/img/AR in.png" alt="AR in"> View in your space
       </button>
@@ -81,38 +129,161 @@
 
       <button id="ar-failure" slot="ar-status">AR is not tracking!</button>
 
+      <!-- ▼ DOM Overlay 루트 (AR 세션에서 보임) -->
       <div id="ar-overlay" slot="ar-dom-overlay">
         <div class="slider">
           <div class="slides">
-            <button class="slide selected" onclick="switchBox(this)" style="background-image:url('/img/AR in.png');" title="Box A"></button>
-            <button class="slide" onclick="switchBox(this)" style="background-image:url('/img/AR in.png');" title="Box B"></button>
-            <button class="slide" onclick="switchBox(this)" style="background-image:url('/img/AR in.png');" title="Box C"></button>
+            <button class="slide selected" title="A" style="background-image:url('/img/AR in.png')"></button>
+            <button class="slide" title="B" style="background-image:url('/img/AR in.png')"></button>
+            <button class="slide" title="C" style="background-image:url('/img/AR in.png')"></button>
           </div>
         </div>
       </div>
     </model-viewer>
-  </main>
+  </div>
+
+  <!-- ▼ 항상 보이는 미러 패널(3D 모드에서도 버튼 보이게) -->
+  <div id="overlay-mirror">
+    <div class="slider">
+      <div class="slides">
+        <button class="slide selected" title="A" style="background-image:url('/img/AR in.png')"></button>
+        <button class="slide" title="B" style="background-image:url('/img/AR in.png')"></button>
+        <button class="slide" title="C" style="background-image:url('/img/AR in.png')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ▼ 항상 보이는 디버그용 버튼/토스트/HUD -->
+  <div id="ui-always">
+    <button id="btn-enter-ar" class="btn">AR 진입(디버그)</button>
+    <button id="btn-overlay-ping" class="btn secondary">Overlay ping</button>
+  </div>
+  <div id="toast" class="toast">메시지</div>
+  <div id="hud">status: <b id="hud-status">-</b> · canActivateAR: <b id="hud-can">-</b> · domOverlayState: <b id="hud-ov">-</b></div>
 
   <script type="module">
+    // --- Build an inline glTF (centered green box) and set as src ---
+    function makeGreenBoxDataURI() {
+      // Cube: vertices centered at origin [-0.5..0.5]
+      const positions = new Float32Array([
+        -0.5,-0.5,-0.5,   0.5,-0.5,-0.5,   0.5, 0.5,-0.5,  -0.5, 0.5,-0.5, // back
+        -0.5,-0.5, 0.5,   0.5,-0.5, 0.5,   0.5, 0.5, 0.5,  -0.5, 0.5, 0.5  // front
+      ]);
+      const indices = new Uint16Array([
+        0,1,2, 0,2,3,   // back
+        4,6,5, 4,7,6,   // front
+        0,4,5, 0,5,1,   // bottom
+        3,2,6, 3,6,7,   // top
+        1,5,6, 1,6,2,   // right
+        0,3,7, 0,7,4    // left
+      ]);
+
+      // Pack into a single binary buffer (positions first, then indices)
+      const bin = new ArrayBuffer(positions.byteLength + indices.byteLength);
+      new Uint8Array(bin).set(new Uint8Array(positions.buffer), 0);
+      new Uint8Array(bin).set(new Uint8Array(indices.buffer), positions.byteLength);
+
+      // Helpers
+      const toB64 = (buf) => {
+        let s = "", b = new Uint8Array(buf);
+        for (let i=0;i<b.length;i++) s += String.fromCharCode(b[i]);
+        return btoa(s);
+      };
+
+      const bufferB64 = toB64(bin);
+      const gltf = {
+        asset: { version: "2.0" },
+        scene: 0,
+        scenes: [{ nodes: [0] }],
+        nodes: [{ mesh: 0 }],
+        meshes: [{
+          primitives: [{
+            attributes: { POSITION: 0 },
+            indices: 1,
+            material: 0,
+            mode: 4 // TRIANGLES
+          }]
+        }],
+        materials: [{
+          pbrMetallicRoughness: {
+            baseColorFactor: [0.2, 0.9, 0.3, 1.0], // GREEN
+            metallicFactor: 0.0,
+            roughnessFactor: 1.0
+          }
+        }],
+        buffers: [{
+          byteLength: bin.byteLength,
+          uri: "data:application/octet-stream;base64," + bufferB64
+        }],
+        bufferViews: [
+          { buffer: 0, byteOffset: 0, byteLength: positions.byteLength, target: 34962 },
+          { buffer: 0, byteOffset: positions.byteLength, byteLength: indices.byteLength, target: 34963 }
+        ],
+        accessors: [
+          {
+            bufferView: 0, byteOffset: 0, componentType: 5126, count: positions.length/3, type: "VEC3",
+            min: [-0.5,-0.5,-0.5], max: [0.5,0.5,0.5]
+          },
+          { bufferView: 1, byteOffset: 0, componentType: 5123, count: indices.length, type: "SCALAR" }
+        ]
+      };
+      const json = JSON.stringify(gltf);
+      const jsonB64 = btoa(unescape(encodeURIComponent(json)));
+      return "data:model/gltf+json;base64," + jsonB64;
+    }
+
     const mv = document.getElementById('mv');
-    document.getElementById('ar-button')?.addEventListener('click', async (e) => {
-      e.preventDefault();
-      try { await mv.enterAR(); } catch (err) { console.warn('enterAR error', err); }
-    });
+    mv.src = makeGreenBoxDataURI();
 
-    // Prevent XR gesture capture on overlay
-    document.querySelector('.slider')?.addEventListener('beforexrselect', (ev) => ev.preventDefault());
-
-    // Demo: UI only toggles selection (model is fixed)
-    window.switchBox = (btn) => {
-      document.querySelectorAll('.slide').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
+    // --- UI wiring (debug & overlay mirror) ---
+    const toast = document.getElementById('toast');
+    const hud = {
+      status: document.getElementById('hud-status'),
+      can:    document.getElementById('hud-can'),
+      ov:     document.getElementById('hud-ov')
     };
 
-    // Debug log for overlay state
-    mv.addEventListener('ar-status', ()=> {
-      const s = mv.xrSession;
-      console.log('[AR] status=', mv.getAttribute('ar-status'), 'domOverlayState=', s?.domOverlayState?.type ?? 'none');
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.style.display = 'none', 2000);
+    }
+
+    document.getElementById('btn-enter-ar')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (!mv.canActivateAR) { showToast('이 환경은 WebXR AR을 지원하지 않습니다.'); return; }
+      try { await mv.enterAR(); } catch (err) { showToast('enterAR 에러: ' + (err?.message || err)); }
+    });
+
+    document.getElementById('ar-overlay')?.addEventListener('beforexrselect', (ev) => ev.preventDefault());
+    document.getElementById('overlay-mirror')?.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(b => b.addEventListener('click', () => {
+      slides.forEach(x => x.classList.remove('selected'));
+      b.classList.add('selected');
+    }));
+
+    document.getElementById('btn-overlay-ping')?.addEventListener('click', () => {
+      const t = mv?.xrSession?.domOverlayState?.type ?? 'none';
+      showToast('domOverlayState: ' + t);
+    });
+
+    function refreshHUD() {
+      try {
+        hud.status.textContent = mv?.getAttribute('ar-status') ?? '-';
+        hud.can.textContent    = mv?.canActivateAR ? 'true' : 'false';
+        hud.ov.textContent     = mv?.xrSession?.domOverlayState?.type ?? 'none';
+      } catch {}
+    }
+    refreshHUD();
+    setInterval(refreshHUD, 500);
+    mv.addEventListener('ar-status', refreshHUD);
+
+    document.getElementById('ar-button')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try { await mv.enterAR(); } catch (err) { showToast('enterAR 에러: ' + (err?.message || err)); }
     });
   </script>
 </body>
