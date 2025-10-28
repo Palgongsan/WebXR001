@@ -75,6 +75,7 @@ model-viewer {
   pointer-events: auto;
   --offset-x: -50%;
   transform: translateX(var(--offset-x)) translateY(0);
+  z-index: 40;
 }
 
 .screen-hotspot:hover,
