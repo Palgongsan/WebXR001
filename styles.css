@@ -47,10 +47,10 @@ model-viewer {
 
 .ar-entry-button {
   position: absolute;
-  top: var(--ar-button-top, 24px);
+  bottom: var(--ar-button-bottom, 24px);
   right: var(--ar-button-right, 24px);
-  width: var(--ar-button-size, 72px);
-  height: var(--ar-button-size, 72px);
+  width: var(--ar-button-size, 36px);
+  height: var(--ar-button-size, 36px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,17 +83,18 @@ model-viewer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.85);
   border: none;
   border-radius: 16px;
   cursor: pointer;
-  transition: transform 120ms ease-in-out, background 120ms ease-in-out;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  transition: transform 120ms ease-in-out, box-shadow 160ms ease-in-out, background 120ms ease-in-out;
 }
 
 .overlay-control:hover,
 .overlay-control:focus-visible {
   transform: translateY(-3px);
-  background: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
   outline: none;
 }
 
@@ -133,31 +134,10 @@ model-viewer {
   --offset-x: 76px;
 }
 
-.screen-hotspot::before {
-  content: "";
-  position: absolute;
-  inset: -8px;
-  border-radius: 18px;
-  border: 2px solid rgba(63, 116, 255, 0.45);
-  opacity: 0.6;
-  animation: hotspot-pulse 2.4s ease-in-out infinite;
-  animation-play-state: running;
-}
-
 .screen-hotspot.hotspot-hidden {
   opacity: 0;
   pointer-events: none;
   transform: translateX(var(--offset-x)) translateY(16px);
-}
-
-.screen-hotspot.hotspot-hidden::before {
-  animation-play-state: paused;
-  opacity: 0;
-}
-
-.screen-hotspot:hover::before,
-.screen-hotspot:focus-visible::before {
-  opacity: 1;
 }
 
 .hotspot-button {
@@ -197,24 +177,12 @@ model-viewer {
   }
 }
 
-@keyframes hotspot-pulse {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0.6;
-  }
-}
-
 /* AR 세션 진입 시 표시되는 기본 바닥 리테일(사각형/원형)을 임시로 숨김 처리 */
+model-viewer::part(ar-hit-test),
 model-viewer::part(ar-hit-test-icon),
 model-viewer::part(ar-hit-test-dot),
-model-viewer::part(ar-hit-test-ring) {
+model-viewer::part(ar-hit-test-ring),
+model-viewer::part(ar-placement) {
+  opacity: 0 !important;
   display: none !important;
 }

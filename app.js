@@ -4,8 +4,8 @@
  * 1) root/ref/ar-barebones.html에서 확인한 WebXR 세션 흐름을 주석으로 정리하고,
  *    실제 구현은 <model-viewer>의 enterAR() 파이프라인을 그대로 활용한다.
  * 2) DOM Overlay 대신 화면 고정형(screen space) 핫스팟으로 버튼들을 구성하고,
- *    3초 동안 입력이 없으면 핫스팟을 서서히 숨기고(auto-hide) 동시에 자동 회전을 시작한다.
- * 3) AR 세션이 시작되면 자동 회전을 즉시 중단하고, 사용자 제스처에 반응하여 다시 표시된다.
+ *    일정 시간 입력이 없으면 핫스팟을 서서히 숨겨 화면을 가리지 않도록 한다.
+ * 3) AR 세션 상태에 따라 핫스팟 노출만 제어하며, 자동 회전 기능은 요구에 따라 제거되었다.
  * 4) 모델 회전은 Z축 기준으로만 적용해 AR 평면 리테일(바닥 표시)의 스케일이 틀어지지 않도록 한다.
  */
 
@@ -20,12 +20,8 @@ const colorCycleButton = document.querySelector("#color-cycle-button");
 const rotateButton = document.querySelector("#rotate-button");
 const screenHotspots = Array.from(document.querySelectorAll(".screen-hotspot"));
 
-/** 사용자 입력 후 핫스팟을 유지하는 시간(ms). 3초 후 서서히 숨긴다. */
+/** 사용자 입력 후 핫스팟을 유지하는 시간(ms). */
 const HOTSPOT_HIDE_DELAY = 3000;
-/** AR 세션 밖에서 자동 회전을 시작하기 전 기본 대기 시간(ms). */
-const AUTO_ROTATE_DELAY = 3000;
-/** 자동 회전 속도(초당 도수). 천천히 회전하도록 낮은 값(12deg/sec)으로 설정한다. */
-const AUTO_ROTATE_SPEED_DEG_PER_SEC = 12;
 
 /** 애니메이션 상태별 UI 속성. 썸네일 교체와 ARIA 레이블을 위한 매핑이다. */
 const ANIMATION_STATE_MAP = {
@@ -60,9 +56,6 @@ const rotationState = {
 
 let baseOrientation = { x: 0, y: 0, z: 0 };
 let hotspotHideTimer = null;
-let autoRotateTimer = null;
-let autoRotateRAF = null;
-let autoRotateActive = false;
 let isInAR = false;
 let modelInitialized = false;
 
@@ -92,18 +85,15 @@ screenHotspots.forEach((btn) => {
 function showScreenHotspots() {
   clearTimeout(hotspotHideTimer);
   screenHotspots.forEach((btn) => btn.classList.remove("hotspot-hidden"));
-  stopAutoRotate();
 }
 
 /**
- * 일정 시간이 지나면 핫스팟을 숨기고 자동 회전을 예약한다.
- * 숨김 → 자동회전으로 자연스럽게 이어지도록 두 기능을 묶는다.
+ * 일정 시간이 지나면 핫스팟을 숨긴다.
  */
 function scheduleHotspotHide(delay = HOTSPOT_HIDE_DELAY) {
   clearTimeout(hotspotHideTimer);
   hotspotHideTimer = setTimeout(() => {
     screenHotspots.forEach((btn) => btn.classList.add("hotspot-hidden"));
-    scheduleAutoRotate(0);
   }, delay);
 }
 
@@ -116,57 +106,9 @@ function bumpHotspotVisibility() {
 }
 
 /**
- * 3D 뷰에서 일정 시간 입력이 없으면 모델을 천천히 자동 회전시켜 상품을 보여준다.
- */
-function startAutoRotate() {
-  if (autoRotateActive || isInAR || !modelViewer) return;
-  autoRotateActive = true;
-
-  let lastTime = performance.now();
-
-  const step = (time) => {
-    if (!autoRotateActive || isInAR) {
-      stopAutoRotate();
-      return;
-    }
-
-    const deltaMs = time - lastTime;
-    lastTime = time;
-    const deltaDeg = (AUTO_ROTATE_SPEED_DEG_PER_SEC * deltaMs) / 1000;
-    applyModelRotation(rotationState.current + deltaDeg);
-
-    autoRotateRAF = requestAnimationFrame(step);
-  };
-
-  autoRotateRAF = requestAnimationFrame(step);
-}
-
-/**
- * 자동 회전을 중단하고 애니메이션 프레임/타이머를 초기화한다.
- */
-function stopAutoRotate() {
-  clearTimeout(autoRotateTimer);
-  if (!autoRotateActive) return;
-  if (autoRotateRAF !== null) {
-    cancelAnimationFrame(autoRotateRAF);
-  }
-  autoRotateActive = false;
-  autoRotateRAF = null;
-}
-
-/**
- * 자동 회전을 일정 시간 후 실행하도록 예약한다.
- */
-function scheduleAutoRotate(delay = AUTO_ROTATE_DELAY) {
-  if (isInAR || autoRotateActive) return;
-  clearTimeout(autoRotateTimer);
-  autoRotateTimer = setTimeout(startAutoRotate, delay);
-}
-
-/**
  * 글로벌 포인터/터치 이벤트를 감지해 핫스팟 표시/숨김을 제어한다.
  * - 시작 이벤트: 즉시 표시
- * - 종료 이벤트: 타이머 후 숨김
+ * - 종료 이벤트: 일정 시간 후 숨김
  */
 const globalStartEvents = ["pointerdown", "touchstart", "mousedown", "selectstart"];
 const globalEndEvents = ["pointerup", "touchend", "mouseup", "pointercancel", "touchcancel", "selectend"];
@@ -207,7 +149,6 @@ if (modelViewer) {
     isInAR = status === "session-started";
 
     if (isInAR) {
-      stopAutoRotate();
       showScreenHotspots();
     } else {
       bumpHotspotVisibility();
@@ -483,7 +424,6 @@ function initializeModelState() {
   updateAnimationUI();
   showScreenHotspots();
   scheduleHotspotHide();
-  scheduleAutoRotate();
 }
 
 /**
